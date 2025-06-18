@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhotoSorter - Web Interface</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📸</text></svg>"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📸 PhotoSorter</h1>
+        <p>Organize your photos and videos by date automatically</p>
+      </div>
+
+      <div class="main-content">
+        <!-- Directory Selection -->
+        <div class="section">
+          <h2>📁 Directory Selection</h2>
+
+          <div class="form-group">
+            <label for="sourceDir">Source Directory:</label>
+            <input
+              type="text"
+              id="sourceDir"
+              class="form-control"
+              placeholder="/path/to/photos"
+              value="."
+            />
+            <button type="button" class="btn" id="browseBtn" style="margin-top: 10px">
+              Browse
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="targetDir">Target Directory (optional):</label>
+            <input
+              type="text"
+              id="targetDir"
+              class="form-control"
+              placeholder="Leave empty to organize in place"
+            />
+          </div>
+
+          <div class="directory-browser hidden" id="directoryBrowser">
+            <div id="directoryList"></div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="section">
+          <h2>⚡ Actions</h2>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="dryRunCheck" checked />
+            <label for="dryRunCheck">Dry Run (preview only)</label>
+          </div>
+
+          <div style="margin-top: 20px">
+            <button type="button" class="btn" id="scanBtn">🔍 Scan Directory</button>
+            <button type="button" class="btn" id="organizeBtn">📋 Organize Photos</button>
+            <button type="button" class="btn btn-danger hidden" id="stopBtn">⏹️ Stop</button>
+          </div>
+
+          <div id="alerts"></div>
+
+          <!-- Connection Status Indicator -->
+          <div class="connection-status">
+            <span id="connectionStatus" class="connected">Connected</span>
+          </div>
+        </div>
+
+        <!-- Status & Statistics -->
+        <div class="section status-section">
+          <h2>📊 Status & Statistics</h2>
+
+          <div class="status-grid">
+            <div class="status-card">
+              <h3>Operation Status</h3>
+              <div class="status-value" id="operationStatus">Ready</div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Found</h3>
+              <div class="status-value" id="filesFound">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Processed</h3>
+              <div class="status-value" id="filesProcessed">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Organized</h3>
+              <div class="status-value" id="filesOrganized">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Moved</h3>
+              <div class="status-value" id="filesMoved">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Skipped</h3>
+              <div class="status-value" id="filesSkipped">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Errors</h3>
+              <div class="status-value" id="errorsCount">0</div>
+            </div>
+
+            <div class="status-card">
+              <h3>Files Copied</h3>
+              <div class="status-value" id="filesCopied">0</div>
+            </div>
+          </div>
+
+          <div class="log-container" id="logContainer">
+            <div class="log-entry">
+              <span class="log-timestamp">[Ready]</span>
+              <span
+                >PhotoSorter Web Interface initialized. Select a directory and choose an
+                action.</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

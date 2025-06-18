@@ -1,0 +1,53 @@
+# Build artifacts
+photo-sorter
+photo-sorter_*
+*.exe
+
+# Go build cache
+.cache
+
+# Test files
+*.test
+coverage.out
+coverage.html
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Test directories
+test/
+testdata/
+
+# Temporary files
+tmp/
+temp/
+
+# Config files (keep example)
+config.yaml
+!config.example.yaml
+
+# Release artifacts
+release/
+
+# Docker files (except Dockerfile)
+.dockerignore
+docker-compose.yml

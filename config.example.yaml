@@ -1,0 +1,115 @@
+# PhotoSorter Configuration File
+# This is an example configuration file for the PhotoSorter application
+
+# Source directory containing media files to organize
+# This is the only required setting
+source_directory: "/path/to/your/photos"
+
+# Target directory for organized files
+# If not set or empty, files will be organized in place within the source directory
+target_directory: "/path/to/organized/photos"
+
+# Date format for directory structure
+# Uses Go time format: "2006" = year, "01" = month, "02" = day
+# Examples:
+#   "2006/01/02" = YYYY/MM/DD (default)
+#   "2006/01" = YYYY/MM
+#   "2006" = YYYY only
+#   "2006-01-02" = YYYY-MM-DD
+date_format: "2006/01/02"
+
+# Supported image file extensions
+supported_extensions:
+  - ".jpg"
+  - ".jpeg"
+  - ".png"
+  - ".tiff"
+  - ".tif"
+  - ".cr2"    # Canon RAW
+  - ".nef"    # Nikon RAW
+  - ".arw"    # Sony RAW
+  - ".dng"    # Digital Negative
+  - ".raw"    # Generic RAW
+
+# File processing settings
+processing:
+  # Move files instead of copying them
+  move_files: true
+
+  # How to handle duplicate files: "rename", "skip", or "overwrite"
+  duplicate_handling: "rename"
+
+  # Skip directories that appear to already be organized by date
+  skip_organized: true
+
+  # Create backup copies before moving/modifying files
+  create_backups: false
+
+# Video processing settings
+video:
+  # MPG/THM file merging settings
+  mpg_processing:
+    # Enable merging of THM thumbnails into MPG video files
+    enable_merging: true
+
+    # Delete THM files after successful merge
+    delete_thm_after_merge: false
+
+    # Create backup of original MPG file before merging
+    create_backup: true
+
+  # Extract metadata from video files for date information
+  extract_video_metadata: true
+
+  # Supported video file extensions
+  supported_extensions:
+    - ".mp4"
+    - ".avi"
+    - ".mov"
+    - ".mpg"
+    - ".thm"    # Thumbnail files
+
+# Performance tuning settings
+performance:
+  # Number of files to process in each batch
+  batch_size: 100
+
+  # Number of worker threads for parallel processing
+  worker_threads: 4
+
+  # Show progress information during processing
+  show_progress: true
+
+  # Size of the EXIF data cache (number of entries)
+  cache_size: 1000
+
+# Security and safety settings
+security:
+  # Run in dry-run mode (simulate without making changes)
+  dry_run: false
+
+  # Ask for confirmation before starting the organization process
+  confirm_before_start: true
+
+  # Maximum number of files to process in a single run (0 = no limit)
+  max_files_per_run: 0
+
+# Logging configuration
+logging:
+  # Log level: "debug", "info", "warn", "error"
+  level: "info"
+
+  # Path to log file (empty = no file logging)
+  file_path: "photo-sorter.log"
+
+  # Maximum size of log file in MB before rotation
+  max_size: 10
+
+  # Maximum number of old log files to keep
+  max_backups: 3
+
+  # Maximum age in days to keep old log files
+  max_age: 30
+
+  # Compress old log files
+  compress: true
