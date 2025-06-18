@@ -18,7 +18,7 @@
 go.work
 
 # Built binaries
-photo-sorter
+/photo-sorter
 photo-sorter_*
 
 # Release artifacts
