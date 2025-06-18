@@ -73,11 +73,19 @@ Start the web server:
 
 Then open your browser to `http://localhost:8080` to access the graphical interface.
 
+**Selecting Folders in Web Interface:**
+
+- **Browse Button**: Click 📁 Browse to open your system's native folder picker
+- **Drag & Drop**: Drag folders directly from Windows Explorer, macOS Finder, or Linux file manager
+- **Manual Entry**: Type or paste folder paths directly
+
 **Web Interface Features:**
 
 - **Configuration Editor**: Change date formats, move/copy mode, and duplicate handling
 - **Real-time Config Preview**: See current settings at a glance
-- Visual directory browser
+- **Native Folder Picker**: System-native folder selection dialog (like file uploads)
+- **Drag & Drop Support**: Drag folders directly from your file manager
+- **Visual Drop Zones**: Clear feedback when selecting folders
 - Real-time progress monitoring via WebSocket
 - Interactive controls for start/stop operations
 - Live statistics and logs
@@ -374,9 +382,24 @@ This will test:
 - Duplicate handling strategies
 - Dry run vs live mode
 
+### Folder Selection Issues
+
+**Native folder picker not opening**
+
+- Ensure you're using a modern browser (Chrome, Firefox, Safari)
+- JavaScript must be enabled for folder picker functionality
+- Try the drag & drop method as alternative
+
+**Drag & drop not working**
+
+- Check browser compatibility (some older browsers don't support folder D&D)
+- Use the Browse button as a reliable fallback
+- Ensure you're dragging folders, not individual files
+
 ### Getting Help
 
 - Check the [issues page](https://github.com/abshka/photo-sorter-go/issues)
 - Run with `--verbose` flag for detailed logging
 - Use `photo-sorter test-exif` to debug specific files
 - Use the test suite to verify your configuration works
+- See `FOLDER_PICKER_DEMO.md` for detailed folder selection guide

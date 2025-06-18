@@ -108,14 +108,15 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind event listeners
+   * Bind events for UI interactions
    */
   bindEvents() {
     // Main action buttons
     this.bindButton("scanBtn", () => this.scanDirectory());
     this.bindButton("organizeBtn", () => this.organizePhotos());
     this.bindButton("stopBtn", () => this.stopOperation());
-    this.bindButton("browseBtn", () => this.toggleDirectoryBrowser());
+    this.bindButton("browseBtn", () => this.openFolderPicker("sourceDir"));
+    this.bindButton("browseTargetBtn", () => this.openFolderPicker("targetDir"));
     this.bindButton("saveConfigBtn", () => this.saveConfig());
 
     // Form inputs
@@ -127,6 +128,14 @@ class PhotoSorterApp {
     this.bindSelect("duplicateHandling", () => this.updateConfigDisplay());
     this.bindCheckbox("moveFilesCheck", () => this.updateConfigDisplay());
     this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
+
+    // Folder picker events
+    this.bindFolderPicker("folderPicker", "sourceDir");
+    this.bindFolderPicker("targetFolderPicker", "targetDir");
+
+    // Drag & drop events
+    this.bindDropZone("dropZone", "sourceDir");
+    this.bindDropZone("targetDropZone", "targetDir");
 
     // Keyboard shortcuts
     this.bindKeyboardShortcuts();
@@ -165,6 +174,8 @@ class PhotoSorterApp {
       element.addEventListener("input", (event) => {
         try {
           validator(event.target.value);
+          // Clear drop zone state when user types manually
+          this.clearDropZoneState(id);
         } catch (error) {
           console.error("Input validation error:", error);
         }
@@ -407,72 +418,111 @@ class PhotoSorterApp {
   }
 
   /**
-   * Toggle directory browser
+   * Open folder picker for specified input
    */
-  async toggleDirectoryBrowser() {
-    const browser = document.getElementById("directoryBrowser");
-    if (!browser) return;
-
-    browser.classList.toggle("hidden");
-
-    if (!browser.classList.contains("hidden")) {
-      await this.loadDirectories(".");
+  openFolderPicker(targetInputId) {
+    const pickerId = targetInputId === "sourceDir" ? "folderPicker" : "targetFolderPicker";
+    const picker = document.getElementById(pickerId);
+    if (picker) {
+      picker.click();
     }
   }
 
   /**
-   * Load directories for browser
+   * Bind folder picker events
    */
-  async loadDirectories(path) {
-    try {
-      const response = await this.fetchWithTimeout(
-        `/api/directories?path=${encodeURIComponent(path)}`,
-      );
-      const data = await response.json();
-
-      if (data.success) {
-        this.renderDirectories(data.data);
-      } else {
-        throw new Error(data.error || "Failed to load directories");
-      }
-    } catch (error) {
-      this.log(`Failed to load directories: ${error.message}`, "error");
-      this.showAlert("Failed to load directories", "error");
+  bindFolderPicker(pickerId, targetInputId) {
+    const picker = document.getElementById(pickerId);
+    if (picker) {
+      picker.addEventListener("change", (event) => {
+        this.handleFolderSelection(event.target.files, targetInputId);
+      });
     }
   }
 
   /**
-   * Render directories in browser
+   * Bind drag & drop events for drop zone
    */
-  renderDirectories(directories) {
-    const list = document.getElementById("directoryList");
-    if (!list) return;
+  bindDropZone(dropZoneId, targetInputId) {
+    const dropZone = document.getElementById(dropZoneId);
+    if (!dropZone) return;
 
-    list.innerHTML = "";
+    // Click to open folder picker
+    dropZone.addEventListener("click", () => {
+      this.openFolderPicker(targetInputId);
+    });
 
-    directories.forEach((dir) => {
-      if (dir.is_directory) {
-        const item = document.createElement("div");
-        item.className = "directory-item";
-        item.innerHTML = `
-          <span class="directory-icon">📁</span>
-          <span>${this.escapeHtml(dir.name)}</span>
-        `;
+    // Drag events
+    dropZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
 
-        item.addEventListener("click", () => {
-          this.setInputValue("sourceDir", dir.path);
-          this.hideElement("directoryBrowser");
-        });
-
-        list.appendChild(item);
+    dropZone.addEventListener("dragleave", (event) => {
+      event.preventDefault();
+      if (!dropZone.contains(event.relatedTarget)) {
+        dropZone.classList.remove("drag-over");
       }
     });
 
-    if (directories.length === 0) {
-      const emptyItem = document.createElement("div");
-      emptyItem.className = "directory-item";
-      emptyItem.innerHTML = "<span>No directories found</span>";
-      list.appendChild(emptyItem);
+    dropZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("drag-over");
+
+      const items = event.dataTransfer.items;
+      if (items) {
+        for (let item of items) {
+          if (item.kind === "file") {
+            const entry = item.webkitGetAsEntry();
+            if (entry && entry.isDirectory) {
+              this.handleDirectoryDrop(entry, targetInputId);
+              break; // Only handle the first directory
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Handle folder selection from picker
+   */
+  handleFolderSelection(files, targetInputId) {
+    if (files.length > 0) {
+      // Get the path of the first file and extract directory
+      const firstFile = files[0];
+      const path = firstFile.webkitRelativePath;
+      const folderPath = path.split("/")[0];
+
+      this.setInputValue(targetInputId, folderPath);
+      this.updateDropZoneState(targetInputId, folderPath);
+      this.log(`Selected folder: ${folderPath}`, "info");
+    }
+  }
+
+  /**
+   * Handle directory drop from drag & drop
+   */
+  handleDirectoryDrop(entry, targetInputId) {
+    const folderPath = entry.fullPath || entry.name;
+    this.setInputValue(targetInputId, folderPath);
+    this.updateDropZoneState(targetInputId, folderPath);
+    this.log(`Dropped folder: ${folderPath}`, "info");
+  }
+
+  /**
+   * Update drop zone visual state
+   */
+  updateDropZoneState(targetInputId, folderPath) {
+    const dropZoneId = targetInputId === "sourceDir" ? "dropZone" : "targetDropZone";
+    const dropZone = document.getElementById(dropZoneId);
+
+    if (dropZone && folderPath) {
+      dropZone.classList.add("has-files");
+      const dropText = dropZone.querySelector(".drop-text");
+      if (dropText) {
+        dropText.textContent = `Selected: ${folderPath}`;
+      }
     }
   }
 
@@ -673,6 +723,26 @@ class PhotoSorterApp {
     const element = document.getElementById(id);
     if (element) {
       element.classList.add("hidden");
+    }
+  }
+
+  /**
+   * Clear drop zone state when input changes manually
+   */
+  clearDropZoneState(targetInputId) {
+    const dropZoneId = targetInputId === "sourceDir" ? "dropZone" : "targetDropZone";
+    const dropZone = document.getElementById(dropZoneId);
+
+    if (dropZone) {
+      dropZone.classList.remove("has-files");
+      const dropText = dropZone.querySelector(".drop-text");
+      if (dropText) {
+        const defaultText =
+          targetInputId === "sourceDir"
+            ? "Drag & drop a folder here or click Browse"
+            : "Drag & drop target folder here or click Browse";
+        dropText.textContent = defaultText;
+      }
     }
   }
 

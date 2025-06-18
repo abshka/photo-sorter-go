@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,14 +54,6 @@ type OrganizeRequest struct {
 	MoveFiles       *bool  `json:"move_files,omitempty"`
 }
 
-type DirectoryInfo struct {
-	Path         string `json:"path"`
-	Name         string `json:"name"`
-	IsDirectory  bool   `json:"is_directory"`
-	Size         int64  `json:"size"`
-	ModifiedTime string `json:"modified_time"`
-}
-
 type WSMessage struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
@@ -93,7 +83,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/scan", s.handleScan).Methods("POST")
 	api.HandleFunc("/organize", s.handleOrganize).Methods("POST")
 	api.HandleFunc("/stop", s.handleStop).Methods("POST")
-	api.HandleFunc("/directories", s.handleListDirectories).Methods("GET")
+
 	api.HandleFunc("/statistics", s.handleGetStatistics).Methods("GET")
 	api.HandleFunc("/config", s.handleGetConfig).Methods("GET")
 	api.HandleFunc("/config", s.handleUpdateConfig).Methods("POST")
@@ -240,48 +230,6 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, APIResponse{
 		Success: true,
 		Message: "Operation stopped",
-	})
-}
-
-func (s *Server) handleListDirectories(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Query().Get("path")
-	if path == "" {
-		path = "."
-	}
-
-	// Security check - prevent directory traversal
-	path = filepath.Clean(path)
-	if strings.Contains(path, "..") {
-		s.writeError(w, "Invalid path", http.StatusBadRequest)
-		return
-	}
-
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		s.writeError(w, fmt.Sprintf("Failed to read directory: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	var directories []DirectoryInfo
-	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-
-		fullPath := filepath.Join(path, entry.Name())
-		directories = append(directories, DirectoryInfo{
-			Path:         fullPath,
-			Name:         entry.Name(),
-			IsDirectory:  entry.IsDir(),
-			Size:         info.Size(),
-			ModifiedTime: info.ModTime().Format(time.RFC3339),
-		})
-	}
-
-	s.writeJSON(w, APIResponse{
-		Success: true,
-		Data:    directories,
 	})
 }
 

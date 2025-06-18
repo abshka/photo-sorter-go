@@ -56,30 +56,61 @@
 
           <div class="form-group">
             <label for="sourceDir">Source Directory:</label>
+            <div class="input-group">
+              <input
+                type="text"
+                id="sourceDir"
+                class="form-control"
+                placeholder="/path/to/photos"
+                value="."
+              />
+              <button type="button" class="btn btn-secondary" id="browseBtn"></button>
+                📁 Browse
+              </button>
+            </div>
             <input
-              type="text"
-              id="sourceDir"
-              class="form-control"
-              placeholder="/path/to/photos"
-              value="."
+              type="file"
+              id="folderPicker"
+              webkitdirectory
+              directory
+              multiple
+              style="display: none;"
             />
-            <button type="button" class="btn" id="browseBtn" style="margin-top: 10px">
-              Browse
-            </button>
+            <div id="dropZone" class="drop-zone" style="margin-top: 10px;">
+              <div class="drop-zone-content">
+                <span class="drop-icon">📁</span>
+                <span class="drop-text">Drag & drop a folder here or click Browse</span>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
             <label for="targetDir">Target Directory (optional):</label>
+            <div class="input-group">
+              <input
+                type="text"
+                id="targetDir"
+                class="form-control"
+                placeholder="Leave empty to organize in place"
+              />
+              <button type="button" class="btn btn-secondary" id="browseTargetBtn">
+                📁 Browse
+              </button>
+            </div>
             <input
-              type="text"
-              id="targetDir"
-              class="form-control"
-              placeholder="Leave empty to organize in place"
+              type="file"
+              id="targetFolderPicker"
+              webkitdirectory
+              directory
+              multiple
+              style="display: none;"
             />
-          </div>
-
-          <div class="directory-browser hidden" id="directoryBrowser">
-            <div id="directoryList"></div>
+            <div id="targetDropZone" class="drop-zone" style="margin-top: 10px;">
+              <div class="drop-zone-content">
+                <span class="drop-icon">📁</span>
+                <span class="drop-text">Drag & drop target folder here or click Browse</span>
+              </div>
+            </div>
           </div>
         </div>
 

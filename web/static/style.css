@@ -215,6 +215,108 @@ select.form-control {
   border-radius: 4px;
   border-left: 3px solid var(--primary-color);
 }
+
+.input-group {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.input-group .form-control {
+  flex: 1;
+}
+
+.input-group .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.drop-zone {
+  border: 2px dashed #ccc;
+  border-radius: var(--border-radius);
+  padding: 20px;
+  text-align: center;
+  background-color: #fafafa;
+  transition: var(--transition);
+  cursor: pointer;
+  user-select: none;
+}
+
+.drop-zone:hover {
+  border-color: var(--primary-color);
+  background-color: rgba(102, 126, 234, 0.05);
+}
+
+.drop-zone.drag-over {
+  border-color: var(--primary-color);
+  background-color: rgba(102, 126, 234, 0.1);
+  transform: scale(1.02);
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.drop-icon {
+  font-size: 24px;
+  opacity: 0.6;
+}
+
+.drop-text {
+  color: var(--dark-gray);
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.drop-zone.has-files {
+  border-color: var(--success-color);
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.drop-zone.has-files .drop-icon {
+  opacity: 1;
+}
+
+.drop-zone.has-files .drop-text {
+  color: var(--success-color);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #5a6268 0%, #343a40 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
@@ -445,49 +547,6 @@ select.form-control {
 
 .hidden {
   display: none !important;
-}
-
-.directory-browser {
-  max-height: 250px;
-  overflow-y: auto;
-  border: 2px solid var(--medium-gray);
-  border-radius: var(--border-radius);
-  margin-top: 15px;
-  background: white;
-  box-shadow: var(--shadow-sm);
-}
-
-.directory-item {
-  padding: 15px;
-  border-bottom: 1px solid var(--medium-gray);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  transition: var(--transition);
-  position: relative;
-}
-
-.directory-item:last-child {
-  border-bottom: none;
-}
-
-.directory-item:hover {
-  background: var(--light-gray);
-  transform: translateX(5px);
-}
-
-.directory-item.selected {
-  background: #e3f2fd;
-  border-left: 4px solid var(--primary-color);
-  color: var(--primary-color);
-  font-weight: 500;
-}
-
-.directory-icon {
-  margin-right: 12px;
-  width: 18px;
-  height: 18px;
-  font-size: 16px;
 }
 
 .checkbox-group {
