@@ -52,6 +52,8 @@ type OrganizeRequest struct {
 	SourceDirectory string `json:"source_directory"`
 	TargetDirectory string `json:"target_directory,omitempty"`
 	DryRun          bool   `json:"dry_run"`
+	DateFormat      string `json:"date_format,omitempty"`
+	MoveFiles       *bool  `json:"move_files,omitempty"`
 }
 
 type DirectoryInfo struct {
@@ -93,6 +95,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/stop", s.handleStop).Methods("POST")
 	api.HandleFunc("/directories", s.handleListDirectories).Methods("GET")
 	api.HandleFunc("/statistics", s.handleGetStatistics).Methods("GET")
+	api.HandleFunc("/config", s.handleGetConfig).Methods("GET")
+	api.HandleFunc("/config", s.handleUpdateConfig).Methods("POST")
+	api.HandleFunc("/date-formats", s.handleGetDateFormats).Methods("GET")
 
 	// WebSocket endpoint
 	s.router.HandleFunc("/ws", s.handleWebSocket)
@@ -310,6 +315,71 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"date_format":        s.cfg.DateFormat,
+			"move_files":         s.cfg.Processing.MoveFiles,
+			"dry_run":            s.cfg.Security.DryRun,
+			"duplicate_handling": s.cfg.Processing.DuplicateHandling,
+			"source_directory":   s.cfg.SourceDirectory,
+			"target_directory":   s.cfg.TargetDirectory,
+		},
+	})
+}
+
+func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var configUpdate struct {
+		DateFormat        string `json:"date_format,omitempty"`
+		MoveFiles         *bool  `json:"move_files,omitempty"`
+		DryRun            *bool  `json:"dry_run,omitempty"`
+		DuplicateHandling string `json:"duplicate_handling,omitempty"`
+		SourceDirectory   string `json:"source_directory,omitempty"`
+		TargetDirectory   string `json:"target_directory,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&configUpdate); err != nil {
+		s.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Update configuration
+	if configUpdate.DateFormat != "" {
+		s.cfg.DateFormat = configUpdate.DateFormat
+	}
+	if configUpdate.MoveFiles != nil {
+		s.cfg.Processing.MoveFiles = *configUpdate.MoveFiles
+	}
+	if configUpdate.DryRun != nil {
+		s.cfg.Security.DryRun = *configUpdate.DryRun
+	}
+	if configUpdate.DuplicateHandling != "" {
+		s.cfg.Processing.DuplicateHandling = configUpdate.DuplicateHandling
+	}
+	if configUpdate.SourceDirectory != "" {
+		s.cfg.SourceDirectory = configUpdate.SourceDirectory
+	}
+	if configUpdate.TargetDirectory != "" {
+		s.cfg.TargetDirectory = &configUpdate.TargetDirectory
+	}
+
+	s.log.Info("Configuration updated via web interface")
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Message: "Configuration updated successfully",
+	})
+}
+
+func (s *Server) handleGetDateFormats(w http.ResponseWriter, r *http.Request) {
+	formats := config.GetAvailableDateFormats()
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    formats,
+	})
+}
+
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -395,6 +465,14 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 		cfg.TargetDirectory = &req.TargetDirectory
 	}
 	cfg.Security.DryRun = req.DryRun
+
+	// Apply config overrides from request
+	if req.DateFormat != "" {
+		cfg.DateFormat = req.DateFormat
+	}
+	if req.MoveFiles != nil {
+		cfg.Processing.MoveFiles = *req.MoveFiles
+	}
 
 	dateExtractor := extractor.NewEXIFExtractor(s.log)
 	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor)

@@ -18,6 +18,38 @@
       </div>
 
       <div class="main-content">
+        <!-- Configuration -->
+        <div class="section">
+          <h2>⚙️ Configuration</h2>
+
+          <div class="form-group">
+            <label for="dateFormat">Date Organization Format:</label>
+            <select id="dateFormat" class="form-control">
+              <option value="2006/01/02">Year/Month/Day (2024/12/25)</option>
+              <option value="2006/01">Year/Month (2024/12)</option>
+              <option value="2006">Year Only (2024)</option>
+              <option value="2006-01-02">Year-Month-Day (2024-12-25)</option>
+              <option value="2006-01">Year-Month (2024-12)</option>
+            </select>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="moveFilesCheck" checked />
+            <label for="moveFilesCheck">Move files (uncheck to copy instead)</label>
+          </div>
+
+          <div class="form-group">
+            <label for="duplicateHandling">Duplicate Handling:</label>
+            <select id="duplicateHandling" class="form-control">
+              <option value="rename">Rename duplicates</option>
+              <option value="skip">Skip duplicates</option>
+              <option value="overwrite">Overwrite duplicates</option>
+            </select>
+          </div>
+
+          <button type="button" class="btn" id="saveConfigBtn">💾 Save Configuration</button>
+        </div>
+
         <!-- Directory Selection -->
         <div class="section">
           <h2>📁 Directory Selection</h2>
@@ -58,6 +90,19 @@
           <div class="checkbox-group">
             <input type="checkbox" id="dryRunCheck" checked />
             <label for="dryRunCheck">Dry Run (preview only)</label>
+          </div>
+
+          <div
+            style="
+              margin-top: 10px;
+              padding: 10px;
+              background-color: #f0f8ff;
+              border-radius: 4px;
+              border: 1px solid #007bff;
+            "
+          >
+            <strong>Current Config:</strong>
+            <div id="currentConfig" style="font-size: 0.9em; margin-top: 5px">Loading...</div>
           </div>
 
           <div style="margin-top: 20px">

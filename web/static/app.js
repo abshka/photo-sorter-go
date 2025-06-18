@@ -5,7 +5,7 @@
 
 class PhotoSorterApp {
   constructor() {
-    this.ws = null;
+    this.wsConnection = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
@@ -13,8 +13,8 @@ class PhotoSorterApp {
 
     this.initializeWebSocket();
     this.bindEvents();
-    this.updateStatus();
     this.startStatusPolling();
+    this.loadConfig();
   }
 
   /**
@@ -78,7 +78,10 @@ class PhotoSorterApp {
   scheduleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      this.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectInterval/1000}s`, "info");
+      this.log(
+        `Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectInterval / 1000}s`,
+        "info",
+      );
 
       setTimeout(() => {
         this.initializeWebSocket();
@@ -97,10 +100,10 @@ class PhotoSorterApp {
    */
   updateConnectionStatus(connected) {
     // Add visual indicator for connection status
-    const statusIndicator = document.getElementById('connectionStatus');
+    const statusIndicator = document.getElementById("connectionStatus");
     if (statusIndicator) {
-      statusIndicator.className = connected ? 'connected' : 'disconnected';
-      statusIndicator.textContent = connected ? 'Connected' : 'Disconnected';
+      statusIndicator.className = connected ? "connected" : "disconnected";
+      statusIndicator.textContent = connected ? "Connected" : "Disconnected";
     }
   }
 
@@ -109,21 +112,28 @@ class PhotoSorterApp {
    */
   bindEvents() {
     // Main action buttons
-    this.bindButton('scanBtn', () => this.scanDirectory());
-    this.bindButton('organizeBtn', () => this.organizePhotos());
-    this.bindButton('stopBtn', () => this.stopOperation());
-    this.bindButton('browseBtn', () => this.toggleDirectoryBrowser());
+    this.bindButton("scanBtn", () => this.scanDirectory());
+    this.bindButton("organizeBtn", () => this.organizePhotos());
+    this.bindButton("stopBtn", () => this.stopOperation());
+    this.bindButton("browseBtn", () => this.toggleDirectoryBrowser());
+    this.bindButton("saveConfigBtn", () => this.saveConfig());
 
     // Form inputs
-    this.bindInput('sourceDir', (value) => this.validateSourceDirectory(value));
-    this.bindInput('targetDir', (value) => this.validateTargetDirectory(value));
+    this.bindInput("sourceDir", (value) => this.validateSourceDirectory(value));
+    this.bindInput("targetDir", (value) => this.validateTargetDirectory(value));
+
+    // Configuration changes
+    this.bindSelect("dateFormat", () => this.updateConfigDisplay());
+    this.bindSelect("duplicateHandling", () => this.updateConfigDisplay());
+    this.bindCheckbox("moveFilesCheck", () => this.updateConfigDisplay());
+    this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
 
     // Keyboard shortcuts
     this.bindKeyboardShortcuts();
 
     // Window events
-    window.addEventListener('beforeunload', () => this.cleanup());
-    window.addEventListener('focus', () => this.updateStatus());
+    window.addEventListener("beforeunload", () => this.cleanup());
+    window.addEventListener("focus", () => this.updateStatus());
   }
 
   /**
@@ -132,7 +142,7 @@ class PhotoSorterApp {
   bindButton(id, handler) {
     const element = document.getElementById(id);
     if (element) {
-      element.addEventListener('click', async (event) => {
+      element.addEventListener("click", async (event) => {
         try {
           element.disabled = true;
           await handler(event);
@@ -147,16 +157,48 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind input with validation
+   * Bind input field with validation
    */
   bindInput(id, validator) {
     const element = document.getElementById(id);
     if (element) {
-      element.addEventListener('input', (event) => {
+      element.addEventListener("input", (event) => {
         try {
           validator(event.target.value);
         } catch (error) {
-          this.log(`Validation error for ${id}: ${error.message}`, "error");
+          console.error("Input validation error:", error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Bind select field with handler
+   */
+  bindSelect(id, handler) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener("change", (event) => {
+        try {
+          handler(event.target.value);
+        } catch (error) {
+          console.error("Select change error:", error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Bind checkbox field with handler
+   */
+  bindCheckbox(id, handler) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener("change", (event) => {
+        try {
+          handler(event.target.checked);
+        } catch (error) {
+          console.error("Checkbox change error:", error);
         }
       });
     }
@@ -166,18 +208,18 @@ class PhotoSorterApp {
    * Bind keyboard shortcuts
    */
   bindKeyboardShortcuts() {
-    document.addEventListener('keydown', (event) => {
+    document.addEventListener("keydown", (event) => {
       if (event.ctrlKey || event.metaKey) {
         switch (event.key) {
-          case 's':
+          case "s":
             event.preventDefault();
             this.scanDirectory();
             break;
-          case 'o':
+          case "o":
             event.preventDefault();
             this.organizePhotos();
             break;
-          case 'Escape':
+          case "Escape":
             event.preventDefault();
             this.stopOperation();
             break;
@@ -202,13 +244,13 @@ class PhotoSorterApp {
    */
   async updateStatus() {
     try {
-      const response = await this.fetchWithTimeout('/api/status', {}, 5000);
+      const response = await this.fetchWithTimeout("/api/status", {}, 5000);
       const data = await response.json();
 
       if (data.success) {
         this.updateUI(data.data);
       } else {
-        throw new Error(data.error || 'Failed to get status');
+        throw new Error(data.error || "Failed to get status");
       }
     } catch (error) {
       if (!this.isConnected) {
@@ -224,24 +266,25 @@ class PhotoSorterApp {
     const { running, statistics } = data;
 
     // Update operation status
-    this.updateElement('operationStatus', running ? 'Running...' : 'Ready');
-    this.updateElement('scanBtn', null, { disabled: running });
-    this.updateElement('organizeBtn', null, { disabled: running });
-    this.toggleElement('stopBtn', running);
+    this.updateElement("operationStatus", running ? "Running..." : "Ready");
+    this.updateElement("scanBtn", null, { disabled: running });
+    this.updateElement("organizeBtn", null, { disabled: running });
+    this.toggleElement("stopBtn", running);
 
     // Update statistics
     if (statistics && statistics.files) {
       const { files } = statistics;
-      this.updateElement('filesFound', files.total_found || 0);
-      this.updateElement('filesProcessed', files.total_processed || 0);
-      this.updateElement('filesOrganized', files.organized || 0);
-      this.updateElement('filesMoved', files.moved || 0);
-      this.updateElement('filesSkipped', files.skipped || 0);
-      this.updateElement('errorsCount', files.errors || 0);
-      this.updateElement('filesCopied', files.copied || 0);
+      this.updateElement("filesFound", files.total_found || 0);
+      this.updateElement("filesProcessed", files.total_processed || 0);
+      this.updateElement("filesOrganized", files.organized || 0);
+      this.updateElement("filesMoved", files.moved || 0);
+      this.updateElement("filesSkipped", files.skipped || 0);
+      this.updateElement("errorsCount", files.errors || 0);
+      this.updateElement("filesCopied", files.copied || 0);
 
       // Update progress bar
-      const progress = files.total_found > 0 ? (files.total_processed / files.total_found) * 100 : 0;
+      const progress =
+        files.total_found > 0 ? (files.total_processed / files.total_found) * 100 : 0;
       this.updateProgressBar(progress);
     }
   }
@@ -250,34 +293,34 @@ class PhotoSorterApp {
    * Scan directory operation
    */
   async scanDirectory() {
-    const sourceDir = this.getInputValue('sourceDir');
+    const sourceDir = this.getInputValue("sourceDir");
     if (!sourceDir) {
-      this.showAlert('Please enter a source directory', 'error');
+      this.showAlert("Please enter a source directory", "error");
       return;
     }
 
     if (!this.validatePath(sourceDir)) {
-      this.showAlert('Please enter a valid directory path', 'error');
+      this.showAlert("Please enter a valid directory path", "error");
       return;
     }
 
     try {
-      const response = await this.fetchWithTimeout('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: sourceDir })
+      const response = await this.fetchWithTimeout("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory: sourceDir }),
       });
 
       const data = await response.json();
       if (data.success) {
-        this.showAlert('Scan started successfully', 'success');
-        this.log(`Scan started for: ${sourceDir}`, 'info');
+        this.showAlert("Scan started successfully", "success");
+        this.log(`Scan started for: ${sourceDir}`, "info");
       } else {
-        throw new Error(data.error || 'Scan failed');
+        throw new Error(data.error || "Scan failed");
       }
     } catch (error) {
-      this.showAlert(`Failed to start scan: ${error.message}`, 'error');
-      this.log(`Scan error: ${error.message}`, 'error');
+      this.showAlert(`Failed to start scan: ${error.message}`, "error");
+      this.log(`Scan error: ${error.message}`, "error");
     }
   }
 
@@ -285,54 +328,61 @@ class PhotoSorterApp {
    * Organize photos operation
    */
   async organizePhotos() {
-    const sourceDir = this.getInputValue('sourceDir');
-    const targetDir = this.getInputValue('targetDir');
-    const dryRun = this.getCheckboxValue('dryRunCheck');
+    const sourceDir = this.getInputValue("sourceDir");
+    const targetDir = this.getInputValue("targetDir");
+    const dryRun = this.getCheckboxValue("dryRunCheck");
 
     if (!sourceDir) {
-      this.showAlert('Please enter a source directory', 'error');
+      this.showAlert("Please enter a source directory", "error");
       return;
     }
 
     if (!this.validatePath(sourceDir)) {
-      this.showAlert('Please enter a valid source directory path', 'error');
+      this.showAlert("Please enter a valid source directory path", "error");
       return;
     }
 
     if (targetDir && !this.validatePath(targetDir)) {
-      this.showAlert('Please enter a valid target directory path', 'error');
+      this.showAlert("Please enter a valid target directory path", "error");
       return;
     }
 
     // Confirm operation if not dry run
     if (!dryRun) {
-      const confirmed = confirm(`Are you sure you want to organize photos?\nSource: ${sourceDir}\nTarget: ${targetDir || 'In place'}\n\nThis will move/modify your files!`);
+      const confirmed = confirm(
+        `Are you sure you want to organize photos?\nSource: ${sourceDir}\nTarget: ${targetDir || "In place"}\n\nThis will move/modify your files!`,
+      );
       if (!confirmed) {
         return;
       }
     }
 
     try {
-      const response = await this.fetchWithTimeout('/api/organize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const dateFormat = this.getSelectValue("dateFormat");
+      const moveFiles = this.getCheckboxValue("moveFilesCheck");
+
+      const response = await this.fetchWithTimeout("/api/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source_directory: sourceDir,
           target_directory: targetDir || null,
-          dry_run: dryRun
-        })
+          dry_run: dryRun,
+          date_format: dateFormat,
+          move_files: moveFiles,
+        }),
       });
 
       const data = await response.json();
       if (data.success) {
-        this.showAlert('Organization started successfully', 'success');
-        this.log(`Organization started (${dryRun ? 'DRY RUN' : 'LIVE'}) for: ${sourceDir}`, 'info');
+        this.showAlert("Organization started successfully", "success");
+        this.log(`Organization started (${dryRun ? "DRY RUN" : "LIVE"}) for: ${sourceDir}`, "info");
       } else {
-        throw new Error(data.error || 'Organization failed');
+        throw new Error(data.error || "Organization failed");
       }
     } catch (error) {
-      this.showAlert(`Failed to start organization: ${error.message}`, 'error');
-      this.log(`Organization error: ${error.message}`, 'error');
+      this.showAlert(`Failed to start organization: ${error.message}`, "error");
+      this.log(`Organization error: ${error.message}`, "error");
     }
   }
 
@@ -341,18 +391,18 @@ class PhotoSorterApp {
    */
   async stopOperation() {
     try {
-      const response = await this.fetchWithTimeout('/api/stop', { method: 'POST' });
+      const response = await this.fetchWithTimeout("/api/stop", { method: "POST" });
       const data = await response.json();
 
       if (data.success) {
-        this.showAlert('Operation stopped', 'info');
-        this.log('Operation stopped by user', 'info');
+        this.showAlert("Operation stopped", "info");
+        this.log("Operation stopped by user", "info");
       } else {
-        throw new Error(data.error || 'Failed to stop operation');
+        throw new Error(data.error || "Failed to stop operation");
       }
     } catch (error) {
-      this.showAlert(`Failed to stop operation: ${error.message}`, 'error');
-      this.log(`Stop error: ${error.message}`, 'error');
+      this.showAlert(`Failed to stop operation: ${error.message}`, "error");
+      this.log(`Stop error: ${error.message}`, "error");
     }
   }
 
@@ -360,13 +410,13 @@ class PhotoSorterApp {
    * Toggle directory browser
    */
   async toggleDirectoryBrowser() {
-    const browser = document.getElementById('directoryBrowser');
+    const browser = document.getElementById("directoryBrowser");
     if (!browser) return;
 
-    browser.classList.toggle('hidden');
+    browser.classList.toggle("hidden");
 
-    if (!browser.classList.contains('hidden')) {
-      await this.loadDirectories('.');
+    if (!browser.classList.contains("hidden")) {
+      await this.loadDirectories(".");
     }
   }
 
@@ -375,17 +425,19 @@ class PhotoSorterApp {
    */
   async loadDirectories(path) {
     try {
-      const response = await this.fetchWithTimeout(`/api/directories?path=${encodeURIComponent(path)}`);
+      const response = await this.fetchWithTimeout(
+        `/api/directories?path=${encodeURIComponent(path)}`,
+      );
       const data = await response.json();
 
       if (data.success) {
         this.renderDirectories(data.data);
       } else {
-        throw new Error(data.error || 'Failed to load directories');
+        throw new Error(data.error || "Failed to load directories");
       }
     } catch (error) {
-      this.log(`Failed to load directories: ${error.message}`, 'error');
-      this.showAlert('Failed to load directories', 'error');
+      this.log(`Failed to load directories: ${error.message}`, "error");
+      this.showAlert("Failed to load directories", "error");
     }
   }
 
@@ -393,23 +445,23 @@ class PhotoSorterApp {
    * Render directories in browser
    */
   renderDirectories(directories) {
-    const list = document.getElementById('directoryList');
+    const list = document.getElementById("directoryList");
     if (!list) return;
 
-    list.innerHTML = '';
+    list.innerHTML = "";
 
     directories.forEach((dir) => {
       if (dir.is_directory) {
-        const item = document.createElement('div');
-        item.className = 'directory-item';
+        const item = document.createElement("div");
+        item.className = "directory-item";
         item.innerHTML = `
           <span class="directory-icon">📁</span>
           <span>${this.escapeHtml(dir.name)}</span>
         `;
 
-        item.addEventListener('click', () => {
-          this.setInputValue('sourceDir', dir.path);
-          this.hideElement('directoryBrowser');
+        item.addEventListener("click", () => {
+          this.setInputValue("sourceDir", dir.path);
+          this.hideElement("directoryBrowser");
         });
 
         list.appendChild(item);
@@ -417,9 +469,9 @@ class PhotoSorterApp {
     });
 
     if (directories.length === 0) {
-      const emptyItem = document.createElement('div');
-      emptyItem.className = 'directory-item';
-      emptyItem.innerHTML = '<span>No directories found</span>';
+      const emptyItem = document.createElement("div");
+      emptyItem.className = "directory-item";
+      emptyItem.innerHTML = "<span>No directories found</span>";
       list.appendChild(emptyItem);
     }
   }
@@ -431,38 +483,38 @@ class PhotoSorterApp {
     const { type, data } = message;
 
     switch (type) {
-      case 'scan_started':
-        this.log(`Scan started for: ${data.directory}`, 'info');
+      case "scan_started":
+        this.log(`Scan started for: ${data.directory}`, "info");
         break;
-      case 'scan_completed':
-        this.log('Scan completed successfully', 'success');
-        this.showAlert('Scan completed!', 'success');
+      case "scan_completed":
+        this.log("Scan completed successfully", "success");
+        this.showAlert("Scan completed!", "success");
         break;
-      case 'scan_error':
-        this.log(`Scan error: ${data.error}`, 'error');
-        this.showAlert(`Scan failed: ${data.error}`, 'error');
+      case "scan_error":
+        this.log(`Scan error: ${data.error}`, "error");
+        this.showAlert(`Scan failed: ${data.error}`, "error");
         break;
-      case 'organize_started':
-        this.log(`Organization started (${data.dry_run ? 'DRY RUN' : 'LIVE'})`, 'info');
+      case "organize_started":
+        this.log(`Organization started (${data.dry_run ? "DRY RUN" : "LIVE"})`, "info");
         break;
-      case 'organize_completed':
-        this.log('Organization completed successfully', 'success');
-        this.showAlert('Organization completed!', 'success');
+      case "organize_completed":
+        this.log("Organization completed successfully", "success");
+        this.showAlert("Organization completed!", "success");
         break;
-      case 'organize_error':
-        this.log(`Organization error: ${data.error}`, 'error');
-        this.showAlert(`Organization failed: ${data.error}`, 'error');
+      case "organize_error":
+        this.log(`Organization error: ${data.error}`, "error");
+        this.showAlert(`Organization failed: ${data.error}`, "error");
         break;
-      case 'operation_stopped':
-        this.log('Operation stopped by user', 'info');
+      case "operation_stopped":
+        this.log("Operation stopped by user", "info");
         break;
-      case 'progress_update':
+      case "progress_update":
         if (data.statistics) {
           this.updateUI({ running: true, statistics: data.statistics });
         }
         break;
       default:
-        this.log(`Unknown message type: ${type}`, 'warning');
+        this.log(`Unknown message type: ${type}`, "warning");
     }
 
     this.updateStatus();
@@ -471,11 +523,11 @@ class PhotoSorterApp {
   /**
    * Log message to console
    */
-  log(message, type = 'info') {
-    const container = document.getElementById('logContainer');
+  log(message, type = "info") {
+    const container = document.getElementById("logContainer");
     if (!container) return;
 
-    const entry = document.createElement('div');
+    const entry = document.createElement("div");
     entry.className = `log-entry log-${type}`;
 
     const timestamp = new Date().toLocaleTimeString();
@@ -494,17 +546,17 @@ class PhotoSorterApp {
     }
 
     // Console logging for debugging
-    console[type === 'error' ? 'error' : 'log'](`[PhotoSorter] ${message}`);
+    console[type === "error" ? "error" : "log"](`[PhotoSorter] ${message}`);
   }
 
   /**
    * Show alert message
    */
   showAlert(message, type) {
-    const alertsContainer = document.getElementById('alerts');
+    const alertsContainer = document.getElementById("alerts");
     if (!alertsContainer) return;
 
-    const alert = document.createElement('div');
+    const alert = document.createElement("div");
     alert.className = `alert alert-${type}`;
     alert.innerHTML = `
       <span>${this.escapeHtml(message)}</span>
@@ -533,7 +585,7 @@ class PhotoSorterApp {
     try {
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -550,8 +602,8 @@ class PhotoSorterApp {
    * Validate file path
    */
   validatePath(path) {
-    if (!path || typeof path !== 'string') return false;
-    if (path.includes('..')) return false; // Security: prevent directory traversal
+    if (!path || typeof path !== "string") return false;
+    if (path.includes("..")) return false; // Security: prevent directory traversal
     return path.trim().length > 0;
   }
 
@@ -560,7 +612,7 @@ class PhotoSorterApp {
    */
   validateSourceDirectory(value) {
     const isValid = this.validatePath(value);
-    this.updateInputValidation('sourceDir', isValid);
+    this.updateInputValidation("sourceDir", isValid);
     return isValid;
   }
 
@@ -569,7 +621,7 @@ class PhotoSorterApp {
    */
   validateTargetDirectory(value) {
     const isValid = !value || this.validatePath(value);
-    this.updateInputValidation('targetDir', isValid);
+    this.updateInputValidation("targetDir", isValid);
     return isValid;
   }
 
@@ -579,8 +631,8 @@ class PhotoSorterApp {
   updateInputValidation(id, isValid) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.toggle('invalid', !isValid);
-      element.classList.toggle('valid', isValid);
+      element.classList.toggle("invalid", !isValid);
+      element.classList.toggle("valid", isValid);
     }
   }
 
@@ -596,7 +648,7 @@ class PhotoSorterApp {
     }
 
     Object.entries(attributes).forEach(([key, value]) => {
-      if (key === 'disabled') {
+      if (key === "disabled") {
         element.disabled = value;
       } else {
         element.setAttribute(key, value);
@@ -610,7 +662,7 @@ class PhotoSorterApp {
   toggleElement(id, show) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.toggle('hidden', !show);
+      element.classList.toggle("hidden", !show);
     }
   }
 
@@ -620,7 +672,7 @@ class PhotoSorterApp {
   hideElement(id) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.add('hidden');
+      element.classList.add("hidden");
     }
   }
 
@@ -629,7 +681,7 @@ class PhotoSorterApp {
    */
   getInputValue(id) {
     const element = document.getElementById(id);
-    return element ? element.value.trim() : '';
+    return element ? element.value.trim() : "";
   }
 
   /**
@@ -651,10 +703,134 @@ class PhotoSorterApp {
   }
 
   /**
+   * Get select value
+   */
+  getSelectValue(id) {
+    const element = document.getElementById(id);
+    return element ? element.value : "";
+  }
+
+  /**
+   * Set select value
+   */
+  setSelectValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.value = value;
+    }
+  }
+
+  /**
+   * Set checkbox value
+   */
+  setCheckboxValue(id, checked) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.checked = checked;
+    }
+  }
+
+  /**
+   * Load configuration from server
+   */
+  async loadConfig() {
+    try {
+      const response = await this.fetchWithTimeout("/api/config");
+      const data = await response.json();
+
+      if (data.success) {
+        const config = data.data;
+
+        // Update form fields
+        this.setSelectValue("dateFormat", config.date_format || "2006/01/02");
+        this.setCheckboxValue("moveFilesCheck", config.move_files !== false);
+        this.setSelectValue("duplicateHandling", config.duplicate_handling || "rename");
+        this.setCheckboxValue("dryRunCheck", config.dry_run !== false);
+
+        if (config.source_directory) {
+          this.setInputValue("sourceDir", config.source_directory);
+        }
+        if (config.target_directory) {
+          this.setInputValue("targetDir", config.target_directory);
+        }
+
+        this.updateConfigDisplay();
+        this.log("Configuration loaded successfully", "info");
+      } else {
+        throw new Error(data.error || "Failed to load config");
+      }
+    } catch (error) {
+      this.log(`Failed to load configuration: ${error.message}`, "error");
+    }
+  }
+
+  /**
+   * Save configuration to server
+   */
+  async saveConfig() {
+    try {
+      const config = {
+        date_format: this.getSelectValue("dateFormat"),
+        move_files: this.getCheckboxValue("moveFilesCheck"),
+        duplicate_handling: this.getSelectValue("duplicateHandling"),
+        dry_run: this.getCheckboxValue("dryRunCheck"),
+        source_directory: this.getInputValue("sourceDir"),
+        target_directory: this.getInputValue("targetDir") || null,
+      };
+
+      const response = await this.fetchWithTimeout("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        this.showAlert("Configuration saved successfully", "success");
+        this.log("Configuration saved", "info");
+        this.updateConfigDisplay();
+      } else {
+        throw new Error(data.error || "Failed to save config");
+      }
+    } catch (error) {
+      this.showAlert(`Failed to save configuration: ${error.message}`, "error");
+      this.log(`Save config error: ${error.message}`, "error");
+    }
+  }
+
+  /**
+   * Update configuration display
+   */
+  updateConfigDisplay() {
+    const dateFormat = this.getSelectValue("dateFormat");
+    const moveFiles = this.getCheckboxValue("moveFilesCheck");
+    const duplicateHandling = this.getSelectValue("duplicateHandling");
+    const dryRun = this.getCheckboxValue("dryRunCheck");
+
+    const formatName =
+      {
+        "2006/01/02": "Year/Month/Day",
+        "2006/01": "Year/Month",
+        2006: "Year Only",
+        "2006-01-02": "Year-Month-Day",
+        "2006-01": "Year-Month",
+      }[dateFormat] || dateFormat;
+
+    const configText = `
+      Format: ${formatName} |
+      Action: ${moveFiles ? "Move" : "Copy"} |
+      Duplicates: ${duplicateHandling} |
+      Mode: ${dryRun ? "Dry Run" : "Live"}
+    `;
+
+    this.updateElement("currentConfig", configText.trim());
+  }
+
+  /**
    * Update progress bar
    */
   updateProgressBar(percentage) {
-    const progressFill = document.getElementById('progressFill');
+    const progressFill = document.getElementById("progressFill");
     if (progressFill) {
       progressFill.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
     }
@@ -664,7 +840,7 @@ class PhotoSorterApp {
    * Escape HTML to prevent XSS
    */
   escapeHtml(text) {
-    const div = document.createElement('div');
+    const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
   }
@@ -680,11 +856,11 @@ class PhotoSorterApp {
 }
 
 // Initialize the application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   window.photoSorterApp = new PhotoSorterApp();
 });
 
 // Export for testing or external access
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
   module.exports = PhotoSorterApp;
 }

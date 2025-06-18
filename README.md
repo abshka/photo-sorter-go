@@ -4,17 +4,23 @@ A powerful command-line tool for automatically organizing photos and videos by d
 
 ## Features
 
-- **Automatic Organization**: Sorts photos and videos into date-based folder structures (YYYY/MM/DD)
+- **Flexible Date Organization**: Multiple date folder structure options:
+  - Year/Month/Day (2024/12/25) - Default
+  - Year/Month (2024/12) - Monthly organization
+  - Year Only (2024) - Yearly organization
+  - With dashes: 2024-12-25, 2024-12
+- **Web Configuration Management**: Edit all settings through the web interface - no config file editing needed
+- **Move or Copy Files**: Choose whether to move files or create organized copies
 - **EXIF Metadata Extraction**: Extracts dates from image EXIF data with multiple fallback strategies
 - **Video Support**: Handles video files and their associated thumbnail files (MPG/THM pairs)
 - **Multiple File Formats**: Supports JPEG, PNG, TIFF, RAW formats (CR2, NEF, ARW, DNG), and video files
-- **Flexible Configuration**: YAML-based configuration with sensible defaults
+- **Flexible Configuration**: YAML-based configuration with web-based editor
 - **Duplicate Handling**: Configurable strategies for handling duplicate files (rename, skip, overwrite)
 - **Dry Run Mode**: Test organization without making any changes
 - **Performance Optimized**: Multi-threaded processing with caching for large photo collections
 - **Comprehensive Logging**: Structured logging with rotation and detailed statistics
 - **Cross-Platform**: Works on Windows, macOS, and Linux
-- **Web Interface**: Modern browser-based interface with real-time progress monitoring
+- **Web Interface**: Modern browser-based interface with real-time progress monitoring and configuration management
 
 ## Installation
 
@@ -69,6 +75,8 @@ Then open your browser to `http://localhost:8080` to access the graphical interf
 
 **Web Interface Features:**
 
+- **Configuration Editor**: Change date formats, move/copy mode, and duplicate handling
+- **Real-time Config Preview**: See current settings at a glance
 - Visual directory browser
 - Real-time progress monitoring via WebSocket
 - Interactive controls for start/stop operations
@@ -123,7 +131,10 @@ Starts the web interface server.
 
 ## Configuration
 
-PhotoSorter uses a YAML configuration file for detailed customization. Copy `config.example.yaml` to `config.yaml` and modify as needed.
+PhotoSorter can be configured in two ways:
+
+1. **Web Interface** (Recommended): Use the built-in configuration editor in the web interface
+2. **YAML File**: Copy `config.example.yaml` to `config.yaml` and modify as needed
 
 ### Configuration Locations
 
@@ -134,6 +145,25 @@ PhotoSorter looks for configuration files in the following order:
 3. `$HOME/.photo-sorter/config.yaml`
 4. `/etc/photo-sorter/config.yaml`
 
+### Date Organization Formats
+
+Choose from multiple organizational structures:
+
+```yaml
+# Full date structure (default)
+date_format: "2006/01/02"    # Creates: 2024/12/25/
+
+# Monthly organization
+date_format: "2006/01"       # Creates: 2024/12/
+
+# Yearly organization
+date_format: "2006"          # Creates: 2024/
+
+# Date with dashes
+date_format: "2006-01-02"    # Creates: 2024-12-25/
+date_format: "2006-01"       # Creates: 2024-12/
+```
+
 ### Key Configuration Options
 
 ```yaml
@@ -143,12 +173,12 @@ source_directory: "/path/to/your/photos"
 # Optional: Target directory (default: organize in place)
 target_directory: "/path/to/organized/photos"
 
-# Date folder format (Go time format)
-date_format: "2006/01/02" # Creates YYYY/MM/DD structure
+# Date folder format - choose from options above
+date_format: "2006/01/02"
 
 # File processing options
 processing:
-  move_files: true # Move vs copy files
+  move_files: true # true = move files, false = copy files
   duplicate_handling: "rename" # rename, skip, or overwrite
   skip_organized: true # Skip already organized folders
 
@@ -211,7 +241,7 @@ PhotoSorter uses a multi-tiered approach to extract dates:
 
 ## Directory Structure Examples
 
-### Default (YYYY/MM/DD)
+### Year/Month/Day Structure (2006/01/02)
 
 ```
 organized_photos/
@@ -229,6 +259,35 @@ organized_photos/
     └── 01/
         └── 01/
             └── NewYear_2024.jpg
+```
+
+### Year/Month Structure (2006/01)
+
+```
+organized_photos/
+├── 2023/
+│   ├── 01/
+│   │   ├── IMG_001.jpg
+│   │   ├── IMG_002.jpg
+│   │   └── VID_001.mp4
+│   └── 12/
+│       └── Christmas_2023.jpg
+└── 2024/
+    └── 01/
+        └── NewYear_2024.jpg
+```
+
+### Year Only Structure (2006)
+
+```
+organized_photos/
+├── 2023/
+│   ├── IMG_001.jpg
+│   ├── IMG_002.jpg
+│   ├── VID_001.mp4
+│   └── Christmas_2023.jpg
+└── 2024/
+    └── NewYear_2024.jpg
 ```
 
 ## Performance Considerations
@@ -266,6 +325,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Troubleshooting
 
+### Configuration Issues
+
+**Web configuration not working**
+
+- Ensure you click "Save Configuration" after making changes
+- Check the "Current Config" display shows your changes
+- Try refreshing the page and reloading configuration
+
+**Files still moved when copy mode selected**
+
+- Verify "Move files" checkbox is unchecked in web interface
+- Save configuration after changing the setting
+- Check that the organize request uses the updated settings
+
 ### Common Issues
 
 **"No date found in EXIF data"**
@@ -286,8 +359,24 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Verify firewall settings allow local connections
 - Try refreshing the browser page
 
+### Testing Your Setup
+
+Run the built-in test suite to verify functionality:
+
+```bash
+go run test_organizer.go
+```
+
+This will test:
+
+- All date format options work correctly
+- Move vs copy functionality
+- Duplicate handling strategies
+- Dry run vs live mode
+
 ### Getting Help
 
 - Check the [issues page](https://github.com/abshka/photo-sorter-go/issues)
 - Run with `--verbose` flag for detailed logging
 - Use `photo-sorter test-exif` to debug specific files
+- Use the test suite to verify your configuration works

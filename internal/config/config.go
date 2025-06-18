@@ -10,6 +10,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+// DateFormatOption represents a predefined date format option
+type DateFormatOption struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Format      string `json:"format"`
+	Example     string `json:"example"`
+	Description string `json:"description"`
+}
+
 // Config represents the main configuration structure
 type Config struct {
 	SourceDirectory     string            `mapstructure:"source_directory" validate:"required"`
@@ -68,6 +77,47 @@ type LoggingConfig struct {
 	MaxBackups int    `mapstructure:"max_backups"`
 	MaxAge     int    `mapstructure:"max_age"` // days
 	Compress   bool   `mapstructure:"compress"`
+}
+
+// GetAvailableDateFormats returns all available date format options
+func GetAvailableDateFormats() []DateFormatOption {
+	return []DateFormatOption{
+		{
+			ID:          "year_month_day",
+			Name:        "Year/Month/Day",
+			Format:      "2006/01/02",
+			Example:     "2024/12/25",
+			Description: "Full date structure with year, month, and day folders",
+		},
+		{
+			ID:          "year_month",
+			Name:        "Year/Month",
+			Format:      "2006/01",
+			Example:     "2024/12",
+			Description: "Monthly organization with year and month folders only",
+		},
+		{
+			ID:          "year_only",
+			Name:        "Year Only",
+			Format:      "2006",
+			Example:     "2024",
+			Description: "Yearly organization with only year folders",
+		},
+		{
+			ID:          "year_dash_month_dash_day",
+			Name:        "Year-Month-Day",
+			Format:      "2006-01-02",
+			Example:     "2024-12-25",
+			Description: "Full date structure with dashes",
+		},
+		{
+			ID:          "year_dash_month",
+			Name:        "Year-Month",
+			Format:      "2006-01",
+			Example:     "2024-12",
+			Description: "Monthly organization with dashes",
+		},
+	}
 }
 
 // DefaultConfig returns a configuration with default values
