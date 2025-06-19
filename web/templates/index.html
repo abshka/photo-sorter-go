@@ -56,59 +56,36 @@
 
           <div class="form-group">
             <label for="sourceDir">Source Directory:</label>
-            <div class="input-group">
-              <input
-                type="text"
-                id="sourceDir"
-                class="form-control"
-                placeholder="/path/to/photos"
-                value="."
-              />
-              <button type="button" class="btn btn-secondary" id="browseBtn">📁 Browse</button>
-            </div>
             <input
-              type="file"
-              id="folderPicker"
-              webkitdirectory
-              directory
-              multiple
-              style="display: none"
+              type="text"
+              id="sourceDir"
+              class="form-control"
+              placeholder="Enter full path: /home/user/Photos or C:\Users\User\Photos"
+              title="Enter the complete absolute path to your photos folder"
+              value="."
             />
-            <div id="dropZone" class="drop-zone" style="margin-top: 10px">
-              <div class="drop-zone-content">
-                <span class="drop-icon">📁</span>
-                <span class="drop-text">Drag & drop a folder here or click Browse</span>
-              </div>
+            <div class="path-help">
+              <strong>💡 Examples:</strong>
+              <ul>
+                <li>
+                  Linux/macOS: <code>/home/username/Pictures</code> or
+                  <code>/Users/username/Photos</code>
+                </li>
+                <li>Windows: <code>C:\Users\Username\Pictures</code> or <code>D:\Photos</code></li>
+              </ul>
             </div>
           </div>
 
           <div class="form-group">
             <label for="targetDir">Target Directory (optional):</label>
-            <div class="input-group">
-              <input
-                type="text"
-                id="targetDir"
-                class="form-control"
-                placeholder="Leave empty to organize in place"
-              />
-              <button type="button" class="btn btn-secondary" id="browseTargetBtn">
-                📁 Browse
-              </button>
-            </div>
             <input
-              type="file"
-              id="targetFolderPicker"
-              webkitdirectory
-              directory
-              multiple
-              style="display: none"
+              type="text"
+              id="targetDir"
+              class="form-control"
+              placeholder="Optional: /path/to/organized/photos or leave empty"
+              title="Enter the complete absolute path to target folder, or leave empty to organize in place"
             />
-            <div id="targetDropZone" class="drop-zone" style="margin-top: 10px">
-              <div class="drop-zone-content">
-                <span class="drop-icon">📁</span>
-                <span class="drop-text">Drag & drop target folder here or click Browse</span>
-              </div>
-            </div>
+            <div class="form-help">Leave empty to organize photos in place</div>
           </div>
         </div>
 
@@ -121,23 +98,15 @@
             <label for="dryRunCheck">Dry Run (preview only)</label>
           </div>
 
-          <div
-            style="
-              margin-top: 10px;
-              padding: 10px;
-              background-color: #f0f8ff;
-              border-radius: 4px;
-              border: 1px solid #007bff;
-            "
-          >
+          <div class="config-info">
             <strong>Current Config:</strong>
-            <div id="currentConfig" style="font-size: 0.9em; margin-top: 5px">Loading...</div>
+            <div id="currentConfig">Loading...</div>
           </div>
 
           <div style="margin-top: 20px">
             <button type="button" class="btn" id="scanBtn">🔍 Scan Directory</button>
             <button type="button" class="btn" id="organizeBtn">📋 Organize Photos</button>
-            <button type="button" class="btn btn-danger hidden" id="stopBtn">⏹️ Stop</button>
+            <button type="button" class="btn btn-danger d-none" id="stopBtn">⏹️ Stop</button>
           </div>
 
           <div id="alerts"></div>
@@ -201,7 +170,7 @@
             <div class="log-entry">
               <span class="log-timestamp">[Ready]</span>
               <span
-                >PhotoSorter Web Interface initialized. Select a directory and choose an
+                >PhotoSorter Web Interface initialized. Enter a directory path and choose an
                 action.</span
               >
             </div>

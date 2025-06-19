@@ -115,8 +115,6 @@ class PhotoSorterApp {
     this.bindButton("scanBtn", () => this.scanDirectory());
     this.bindButton("organizeBtn", () => this.organizePhotos());
     this.bindButton("stopBtn", () => this.stopOperation());
-    this.bindButton("browseBtn", () => this.openFolderPicker("sourceDir"));
-    this.bindButton("browseTargetBtn", () => this.openFolderPicker("targetDir"));
     this.bindButton("saveConfigBtn", () => this.saveConfig());
 
     // Form inputs
@@ -128,14 +126,6 @@ class PhotoSorterApp {
     this.bindSelect("duplicateHandling", () => this.updateConfigDisplay());
     this.bindCheckbox("moveFilesCheck", () => this.updateConfigDisplay());
     this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
-
-    // Folder picker events
-    this.bindFolderPicker("folderPicker", "sourceDir");
-    this.bindFolderPicker("targetFolderPicker", "targetDir");
-
-    // Drag & drop events
-    this.bindDropZone("dropZone", "sourceDir");
-    this.bindDropZone("targetDropZone", "targetDir");
 
     // Keyboard shortcuts
     this.bindKeyboardShortcuts();
@@ -315,6 +305,14 @@ class PhotoSorterApp {
       return;
     }
 
+    // Check if this looks like a relative path and warn user
+    if (!sourceDir.startsWith("/") && !sourceDir.match(/^[A-Za-z]:/)) {
+      this.showAlert(
+        `Warning: "${sourceDir}" appears to be a relative path. Please enter the full absolute path to your folder (e.g., /home/user/Photos or C:\\Users\\User\\Photos)`,
+        "warning",
+      );
+    }
+
     try {
       const response = await this.fetchWithTimeout("/api/scan", {
         method: "POST",
@@ -325,13 +323,19 @@ class PhotoSorterApp {
       const data = await response.json();
       if (data.success) {
         this.showAlert("Scan started successfully", "success");
-        this.log(`Scan started for: ${sourceDir}`, "info");
       } else {
         throw new Error(data.error || "Scan failed");
       }
     } catch (error) {
-      this.showAlert(`Failed to start scan: ${error.message}`, "error");
-      this.log(`Scan error: ${error.message}`, "error");
+      let errorMessage = error.message;
+
+      // Provide more helpful error messages
+      if (error.message.includes("400") || error.message.includes("Bad Request")) {
+        errorMessage = `Directory not found: "${sourceDir}". Please check the path and ensure you're using the full absolute path to your folder.`;
+      }
+
+      this.showAlert(`Failed to start scan: ${errorMessage}`, "error");
+      this.log(`Scan error: ${errorMessage}`, "error");
     }
   }
 
@@ -387,7 +391,6 @@ class PhotoSorterApp {
       const data = await response.json();
       if (data.success) {
         this.showAlert("Organization started successfully", "success");
-        this.log(`Organization started (${dryRun ? "DRY RUN" : "LIVE"}) for: ${sourceDir}`, "info");
       } else {
         throw new Error(data.error || "Organization failed");
       }
@@ -407,7 +410,6 @@ class PhotoSorterApp {
 
       if (data.success) {
         this.showAlert("Operation stopped", "info");
-        this.log("Operation stopped by user", "info");
       } else {
         throw new Error(data.error || "Failed to stop operation");
       }
@@ -418,122 +420,17 @@ class PhotoSorterApp {
   }
 
   /**
-   * Open folder picker for specified input
-   */
-  openFolderPicker(targetInputId) {
-    const pickerId = targetInputId === "sourceDir" ? "folderPicker" : "targetFolderPicker";
-    const picker = document.getElementById(pickerId);
-    if (picker) {
-      picker.click();
-    }
-  }
-
-  /**
-   * Bind folder picker events
-   */
-  bindFolderPicker(pickerId, targetInputId) {
-    const picker = document.getElementById(pickerId);
-    if (picker) {
-      picker.addEventListener("change", (event) => {
-        this.handleFolderSelection(event.target.files, targetInputId);
-      });
-    }
-  }
-
-  /**
-   * Bind drag & drop events for drop zone
-   */
-  bindDropZone(dropZoneId, targetInputId) {
-    const dropZone = document.getElementById(dropZoneId);
-    if (!dropZone) return;
-
-    // Click to open folder picker
-    dropZone.addEventListener("click", () => {
-      this.openFolderPicker(targetInputId);
-    });
-
-    // Drag events
-    dropZone.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      dropZone.classList.add("drag-over");
-    });
-
-    dropZone.addEventListener("dragleave", (event) => {
-      event.preventDefault();
-      if (!dropZone.contains(event.relatedTarget)) {
-        dropZone.classList.remove("drag-over");
-      }
-    });
-
-    dropZone.addEventListener("drop", (event) => {
-      event.preventDefault();
-      dropZone.classList.remove("drag-over");
-
-      const items = event.dataTransfer.items;
-      if (items) {
-        for (let item of items) {
-          if (item.kind === "file") {
-            const entry = item.webkitGetAsEntry();
-            if (entry && entry.isDirectory) {
-              this.handleDirectoryDrop(entry, targetInputId);
-              break; // Only handle the first directory
-            }
-          }
-        }
-      }
-    });
-  }
-
-  /**
-   * Handle folder selection from picker
-   */
-  handleFolderSelection(files, targetInputId) {
-    if (files.length > 0) {
-      // Get the path of the first file and extract directory
-      const firstFile = files[0];
-      const path = firstFile.webkitRelativePath;
-      const folderPath = path.split("/")[0];
-
-      this.setInputValue(targetInputId, folderPath);
-      this.updateDropZoneState(targetInputId, folderPath);
-      this.log(`Selected folder: ${folderPath}`, "info");
-    }
-  }
-
-  /**
-   * Handle directory drop from drag & drop
-   */
-  handleDirectoryDrop(entry, targetInputId) {
-    const folderPath = entry.fullPath || entry.name;
-    this.setInputValue(targetInputId, folderPath);
-    this.updateDropZoneState(targetInputId, folderPath);
-    this.log(`Dropped folder: ${folderPath}`, "info");
-  }
-
-  /**
-   * Update drop zone visual state
-   */
-  updateDropZoneState(targetInputId, folderPath) {
-    const dropZoneId = targetInputId === "sourceDir" ? "dropZone" : "targetDropZone";
-    const dropZone = document.getElementById(dropZoneId);
-
-    if (dropZone && folderPath) {
-      dropZone.classList.add("has-files");
-      const dropText = dropZone.querySelector(".drop-text");
-      if (dropText) {
-        dropText.textContent = `Selected: ${folderPath}`;
-      }
-    }
-  }
-
-  /**
    * Handle WebSocket messages
    */
   handleWebSocketMessage(message) {
     const { type, data } = message;
 
+    // Debug: log all incoming WebSocket messages
+    console.log("WebSocket message received:", { type, data, timestamp: new Date().toISOString() });
+
     switch (type) {
       case "scan_started":
+        console.log("Processing scan_started message:", data);
         this.log(`Scan started for: ${data.directory}`, "info");
         break;
       case "scan_completed":
@@ -545,7 +442,11 @@ class PhotoSorterApp {
         this.showAlert(`Scan failed: ${data.error}`, "error");
         break;
       case "organize_started":
-        this.log(`Organization started (${data.dry_run ? "DRY RUN" : "LIVE"})`, "info");
+        const targetInfo = data.target_directory ? ` → ${data.target_directory}` : " (in place)";
+        this.log(
+          `Organization started (${data.dry_run ? "DRY RUN" : "LIVE"}) for: ${data.source_directory}${targetInfo}`,
+          "info",
+        );
         break;
       case "organize_completed":
         this.log("Organization completed successfully", "success");
@@ -610,7 +511,7 @@ class PhotoSorterApp {
     alert.className = `alert alert-${type}`;
     alert.innerHTML = `
       <span>${this.escapeHtml(message)}</span>
-      <button class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+      <button class="btn-close" onclick="this.parentElement.remove()"></button>
     `;
 
     alertsContainer.appendChild(alert);
@@ -654,7 +555,13 @@ class PhotoSorterApp {
   validatePath(path) {
     if (!path || typeof path !== "string") return false;
     if (path.includes("..")) return false; // Security: prevent directory traversal
-    return path.trim().length > 0;
+    const trimmed = path.trim();
+    if (trimmed.length === 0) return false;
+
+    // Basic path format validation
+    // Allow both Unix-style (/path/to/dir) and Windows-style (C:\path\to\dir) paths
+    const isValidFormat = /^([a-zA-Z]:[\\\/]|[\\\/]|[a-zA-Z0-9])[^<>:"|?*]*$/.test(trimmed);
+    return isValidFormat;
   }
 
   /**
@@ -681,8 +588,12 @@ class PhotoSorterApp {
   updateInputValidation(id, isValid) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.toggle("invalid", !isValid);
-      element.classList.toggle("valid", isValid);
+      element.classList.remove("is-valid", "is-invalid");
+      if (isValid) {
+        element.classList.add("is-valid");
+      } else {
+        element.classList.add("is-invalid");
+      }
     }
   }
 
@@ -712,7 +623,7 @@ class PhotoSorterApp {
   toggleElement(id, show) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.toggle("hidden", !show);
+      element.classList.toggle("d-none", !show);
     }
   }
 
@@ -722,27 +633,7 @@ class PhotoSorterApp {
   hideElement(id) {
     const element = document.getElementById(id);
     if (element) {
-      element.classList.add("hidden");
-    }
-  }
-
-  /**
-   * Clear drop zone state when input changes manually
-   */
-  clearDropZoneState(targetInputId) {
-    const dropZoneId = targetInputId === "sourceDir" ? "dropZone" : "targetDropZone";
-    const dropZone = document.getElementById(dropZoneId);
-
-    if (dropZone) {
-      dropZone.classList.remove("has-files");
-      const dropText = dropZone.querySelector(".drop-text");
-      if (dropText) {
-        const defaultText =
-          targetInputId === "sourceDir"
-            ? "Drag & drop a folder here or click Browse"
-            : "Drag & drop target folder here or click Browse";
-        dropText.textContent = defaultText;
-      }
+      element.classList.add("d-none");
     }
   }
 

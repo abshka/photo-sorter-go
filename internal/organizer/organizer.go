@@ -264,7 +264,7 @@ func (fo *FileOrganizer) processFile(file FileInfo) {
 
 	// Handle thumbnail if exists
 	if file.ThumbnailPath != "" {
-		fo.processThumbnail(file, targetPath, *date)
+		fo.processThumbnail(file, targetPath)
 	}
 
 	fo.stats.IncrementFilesOrganized()
@@ -389,7 +389,7 @@ func (fo *FileOrganizer) generateUniqueFilename(basePath string) string {
 }
 
 // processThumbnail processes the thumbnail file associated with a video
-func (fo *FileOrganizer) processThumbnail(file FileInfo, videoTargetPath string, date time.Time) {
+func (fo *FileOrganizer) processThumbnail(file FileInfo, videoTargetPath string) {
 	if file.ThumbnailPath == "" {
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -304,23 +305,13 @@ func (c *Config) GetAllSupportedExtensions() []string {
 // IsImageExtension checks if the extension is for an image file
 func (c *Config) IsImageExtension(ext string) bool {
 	ext = strings.ToLower(ext)
-	for _, supportedExt := range c.SupportedExtensions {
-		if ext == supportedExt {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.SupportedExtensions, ext)
 }
 
 // IsVideoExtension checks if the extension is for a video file
 func (c *Config) IsVideoExtension(ext string) bool {
 	ext = strings.ToLower(ext)
-	for _, supportedExt := range c.Video.SupportedExtensions {
-		if ext == supportedExt {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.Video.SupportedExtensions, ext)
 }
 
 // Helper functions

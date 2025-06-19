@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +67,7 @@ func testDateFormats() {
 
 func testMoveVsCopy() {
 	// Create temporary test directory
-	testDir, err := ioutil.TempDir("", "photosorter_test_")
+	testDir, err := os.MkdirTemp("", "photosorter_test_")
 	if err != nil {
 		fmt.Printf("❌ Failed to create test directory: %v\n", err)
 		return
@@ -77,7 +76,7 @@ func testMoveVsCopy() {
 
 	// Create test file
 	testFile := filepath.Join(testDir, "test_photo.jpg")
-	err = ioutil.WriteFile(testFile, []byte("test image data"), 0644)
+	err = os.WriteFile(testFile, []byte("test image data"), 0644)
 	if err != nil {
 		fmt.Printf("❌ Failed to create test file: %v\n", err)
 		return
@@ -90,7 +89,7 @@ func testMoveVsCopy() {
 	testMoveOrCopyConfig(testDir, true)
 
 	// Recreate test file for copy test
-	err = ioutil.WriteFile(testFile, []byte("test image data"), 0644)
+	err = os.WriteFile(testFile, []byte("test image data"), 0644)
 	if err != nil {
 		fmt.Printf("❌ Failed to recreate test file: %v\n", err)
 		return
@@ -163,7 +162,7 @@ func testDuplicateHandling() {
 
 func testDryRunMode() {
 	// Create temporary test directory
-	testDir, err := ioutil.TempDir("", "photosorter_dryrun_")
+	testDir, err := os.MkdirTemp("", "photosorter_dryrun_")
 	if err != nil {
 		fmt.Printf("❌ Failed to create test directory: %v\n", err)
 		return
@@ -172,7 +171,7 @@ func testDryRunMode() {
 
 	// Create test file
 	testFile := filepath.Join(testDir, "test_photo.jpg")
-	err = ioutil.WriteFile(testFile, []byte("test image data"), 0644)
+	err = os.WriteFile(testFile, []byte("test image data"), 0644)
 	if err != nil {
 		fmt.Printf("❌ Failed to create test file: %v\n", err)
 		return

@@ -36,10 +36,10 @@ type Server struct {
 }
 
 type APIResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Data    any    `json:"data,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 type ScanRequest struct {
@@ -55,8 +55,8 @@ type OrganizeRequest struct {
 }
 
 type WSMessage struct {
-	Type string      `json:"type"`
-	Data interface{} `json:"data"`
+	Type string `json:"type"`
+	Data any    `json:"data"`
 }
 
 func NewServer(cfg *config.Config, log *logrus.Logger) *Server {
@@ -132,11 +132,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	stats := s.currentStats
 	s.operationMutex.RUnlock()
 
-	var statsData interface{}
+	var statsData any
 	if stats != nil {
-		statsData = map[string]interface{}{
+		statsData = map[string]any{
 			"summary": stats.GetSummary(),
-			"files": map[string]interface{}{
+			"files": map[string]any{
 				"total_found":     atomic.LoadInt64(&stats.TotalFilesFound),
 				"total_processed": atomic.LoadInt64(&stats.TotalFilesProcessed),
 				"organized":       atomic.LoadInt64(&stats.FilesOrganized),
@@ -150,7 +150,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	s.writeJSON(w, APIResponse{
 		Success: true,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"running":    running,
 			"statistics": statsData,
 		},
@@ -223,7 +223,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.isRunning = false
 	s.operationMutex.Unlock()
 
-	s.broadcastWSMessage("operation_stopped", map[string]interface{}{
+	s.broadcastWSMessage("operation_stopped", map[string]any{
 		"message": "Operation stopped by user",
 	})
 
@@ -248,9 +248,9 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 
 	s.writeJSON(w, APIResponse{
 		Success: true,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"summary": stats.GetSummary(),
-			"files": map[string]interface{}{
+			"files": map[string]any{
 				"total_found":     atomic.LoadInt64(&stats.TotalFilesFound),
 				"total_processed": atomic.LoadInt64(&stats.TotalFilesProcessed),
 				"organized":       atomic.LoadInt64(&stats.FilesOrganized),
@@ -266,7 +266,7 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, APIResponse{
 		Success: true,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"date_format":        s.cfg.DateFormat,
 			"move_files":         s.cfg.Processing.MoveFiles,
 			"dry_run":            s.cfg.Security.DryRun,
@@ -365,7 +365,7 @@ func (s *Server) runScanAsync(directory string) {
 	s.currentStats = statistics.NewStatistics()
 	s.operationMutex.Unlock()
 
-	s.broadcastWSMessage("scan_started", map[string]interface{}{
+	s.broadcastWSMessage("scan_started", map[string]any{
 		"directory": directory,
 	})
 
@@ -384,11 +384,11 @@ func (s *Server) runScanAsync(directory string) {
 	s.operationMutex.Unlock()
 
 	if err != nil {
-		s.broadcastWSMessage("scan_error", map[string]interface{}{
+		s.broadcastWSMessage("scan_error", map[string]any{
 			"error": err.Error(),
 		})
 	} else {
-		s.broadcastWSMessage("scan_completed", map[string]interface{}{
+		s.broadcastWSMessage("scan_completed", map[string]any{
 			"statistics": s.currentStats.GetSummary(),
 		})
 	}
@@ -400,7 +400,7 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 	s.currentStats = statistics.NewStatistics()
 	s.operationMutex.Unlock()
 
-	s.broadcastWSMessage("organize_started", map[string]interface{}{
+	s.broadcastWSMessage("organize_started", map[string]any{
 		"source_directory": req.SourceDirectory,
 		"target_directory": req.TargetDirectory,
 		"dry_run":          req.DryRun,
@@ -432,17 +432,17 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 	s.operationMutex.Unlock()
 
 	if err != nil {
-		s.broadcastWSMessage("organize_error", map[string]interface{}{
+		s.broadcastWSMessage("organize_error", map[string]any{
 			"error": err.Error(),
 		})
 	} else {
-		s.broadcastWSMessage("organize_completed", map[string]interface{}{
+		s.broadcastWSMessage("organize_completed", map[string]any{
 			"statistics": s.currentStats.GetSummary(),
 		})
 	}
 }
 
-func (s *Server) broadcastWSMessage(messageType string, data interface{}) {
+func (s *Server) broadcastWSMessage(messageType string, data any) {
 	message := WSMessage{
 		Type: messageType,
 		Data: data,
@@ -472,7 +472,7 @@ func (s *Server) broadcastWSMessage(messageType string, data interface{}) {
 	}
 }
 
-func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
+func (s *Server) writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
 }

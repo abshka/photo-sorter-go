@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -67,12 +68,7 @@ func (e *EXIFExtractor) SupportsFile(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	supportedExts := []string{".jpg", ".jpeg", ".png", ".tiff", ".tif", ".cr2", ".nef", ".arw", ".dng", ".raw"}
 
-	for _, supportedExt := range supportedExts {
-		if ext == supportedExt {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(supportedExts, ext)
 }
 
 // GetPriority returns the priority of this extractor

@@ -73,24 +73,22 @@ Start the web server:
 
 Then open your browser to `http://localhost:8080` to access the graphical interface.
 
-**Selecting Folders in Web Interface:**
+**Directory Input:**
 
-- **Browse Button**: Click 📁 Browse to open your system's native folder picker
-- **Drag & Drop**: Drag folders directly from Windows Explorer, macOS Finder, or Linux file manager
-- **Manual Entry**: Type or paste folder paths directly
+- **Manual Entry**: Simply type or paste the complete absolute path to your photos folder (e.g., `/home/user/Photos` or `C:\Users\User\Pictures`)
 
 **Web Interface Features:**
 
+- **Clean Minimalist Design**: Elegant interface focused on functionality over decoration
 - **Configuration Editor**: Change date formats, move/copy mode, and duplicate handling
 - **Real-time Config Preview**: See current settings at a glance
-- **Native Folder Picker**: System-native folder selection dialog (like file uploads)
-- **Drag & Drop Support**: Drag folders directly from your file manager
-- **Visual Drop Zones**: Clear feedback when selecting folders
-- Real-time progress monitoring via WebSocket
-- Interactive controls for start/stop operations
-- Live statistics and logs
-- Dry run mode for safe testing
-- Responsive design for desktop and mobile
+- **Simple Path Input**: Direct entry of absolute paths with helpful examples and tips
+- **Real-time Progress Monitoring**: Live WebSocket updates with visual progress indicators
+- **Interactive Statistics Dashboard**: Clean overview of operation progress
+- **Activity Log**: Detailed real-time logging with color-coded message types
+- **Dry Run Mode**: Safe testing without making any changes
+- **Connection Status**: Visual indicator of server connection
+- **Responsive Design**: Works beautifully on desktop, tablet, and mobile devices
 
 ## Commands
 
@@ -361,6 +359,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Check source file permissions
 - Run with appropriate user privileges
 
+**Directory path issues**
+
+- **"Directory does not exist" error**: Ensure you're using the complete absolute path
+  - Linux/macOS: `/home/username/Pictures` or `/Users/username/Pictures`
+  - Windows: `C:\Users\Username\Pictures` or `D:\Photos`
+- **Relative paths not working**: Avoid using relative paths like `./Photos` or `PhotosTest`
+- **Manual path entry is the only method**: The interface uses simple text input fields for maximum reliability
+
 **Web interface connection issues**
 
 - Check that the server is running on the correct port
@@ -382,19 +388,14 @@ This will test:
 - Duplicate handling strategies
 - Dry run vs live mode
 
-### Folder Selection Issues
+### Directory Path Issues
 
-**Native folder picker not opening**
+**Path input not working**
 
-- Ensure you're using a modern browser (Chrome, Firefox, Safari)
-- JavaScript must be enabled for folder picker functionality
-- Try the drag & drop method as alternative
-
-**Drag & drop not working**
-
-- Check browser compatibility (some older browsers don't support folder D&D)
-- Use the Browse button as a reliable fallback
-- Ensure you're dragging folders, not individual files
+- Ensure you're using complete absolute paths (e.g., `/home/user/Photos` not just `Photos`)
+- Check that the directory exists and you have read permissions
+- Use forward slashes on Linux/macOS, backslashes on Windows
+- The interface provides helpful examples for each operating system
 
 ### Getting Help
 
