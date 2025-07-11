@@ -5,6 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PhotoSorter - Web Interface</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      /* Styles for compression results table */
+      #compressionStatus,
+      #compressionResults {
+        margin-top: 15px;
+      }
+      #compressionResults table {
+        width: 100%;
+        font-size: 14px;
+        border-collapse: collapse;
+        table-layout: fixed; /* Helps with long paths */
+      }
+      #compressionResults th,
+      #compressionResults td {
+        border: 1px solid var(--medium-gray);
+        padding: 10px;
+        text-align: left;
+        word-wrap: break-word;
+      }
+      #compressionResults th {
+        background-color: var(--light-gray);
+        font-weight: 600;
+      }
+      /* Ensure file paths break correctly */
+      #compressionResults td:first-child {
+        word-break: break-all;
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+        font-size: 12px;
+      }
+      .status-icon {
+        font-size: 1.2em;
+      }
+      .actions-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      .actions-row .btn {
+        flex: 1 1 0;
+        min-width: 120px;
+        max-width: 220px;
+      }
+      #compressionSummary {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 1.1em;
+        width: 100%;
+        white-space: pre-line;
+      }
+    </style>
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📸</text></svg>"
@@ -89,6 +142,64 @@
           </div>
         </div>
 
+        <!-- Image Compression -->
+        <div class="section" id="compressionSection">
+          <h2>🗜️ Image Compression</h2>
+          <div class="form-group">
+            <label for="compressionEnabled">
+              <input type="checkbox" id="compressionEnabled" />
+              Enable Image Compression
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="compressionQuality">JPEG/WebP Quality:</label>
+            <input
+              type="number"
+              id="compressionQuality"
+              min="1"
+              max="100"
+              value="85"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label for="compressionThreshold"
+              >Keep original if compressed ≥ original × threshold:</label
+            >
+            <input
+              type="number"
+              id="compressionThreshold"
+              min="1"
+              max="2"
+              step="0.01"
+              value="1.01"
+              class="form-control"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="compressionFormats">Formats (comma-separated):</label>
+            <input
+              type="text"
+              id="compressionFormats"
+              class="form-control"
+              value=".jpg,.jpeg,.png,.webp"
+            />
+          </div>
+          <div class="form-group">
+            <label
+              >Compressed images will be saved to the <b>Target Directory</b> (or source directory
+              if target is empty).</label
+            >
+            <div class="form-help">
+              <b>Note:</b> There is no separate output directory for compressed images. They will be
+              placed alongside organized files.
+            </div>
+          </div>
+          <div id="compressionStatus"></div>
+          <div id="compressionResults"></div>
+        </div>
+
         <!-- Actions -->
         <div class="section">
           <h2>⚡ Actions</h2>
@@ -103,11 +214,14 @@
             <div id="currentConfig">Loading...</div>
           </div>
 
-          <div style="margin-top: 20px">
-            <button type="button" class="btn" id="scanBtn">🔍 Scan Directory</button>
-            <button type="button" class="btn" id="organizeBtn">📋 Organize Photos</button>
-            <button type="button" class="btn btn-danger d-none" id="stopBtn">⏹️ Stop</button>
-          </div>
+          <div class="actions-center" style="margin-top: 20px">
+            <div class="actions-row" style="margin-top: 20px">
+              <button type="button" class="btn" id="scanBtn">🔍 Scan</button>
+              <button type="button" class="btn" id="organizeBtn">📋 Organize</button>
+              <button type="button" class="btn" id="startCompressionBtn">🗜️ Compress</button>
+              <button type="button" class="btn btn-danger d-none" id="stopBtn">⏹️ Stop</button>
+            </div>
+            <div id="compressionSummary"></div>
 
           <div id="alerts"></div>
 
@@ -117,63 +231,12 @@
           </div>
         </div>
 
-        <!-- Status & Statistics -->
-        <div class="section status-section">
-          <h2>📊 Status & Statistics</h2>
-
-          <div class="status-grid">
-            <div class="status-card">
-              <h3>Operation Status</h3>
-              <div class="status-value" id="operationStatus">Ready</div>
-              <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-              </div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Found</h3>
-              <div class="status-value" id="filesFound">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Processed</h3>
-              <div class="status-value" id="filesProcessed">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Organized</h3>
-              <div class="status-value" id="filesOrganized">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Moved</h3>
-              <div class="status-value" id="filesMoved">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Skipped</h3>
-              <div class="status-value" id="filesSkipped">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Errors</h3>
-              <div class="status-value" id="errorsCount">0</div>
-            </div>
-
-            <div class="status-card">
-              <h3>Files Copied</h3>
-              <div class="status-value" id="filesCopied">0</div>
-            </div>
-          </div>
-
-          <div class="log-container" id="logContainer">
-            <div class="log-entry">
-              <span class="log-timestamp">[Ready]</span>
-              <span
-                >PhotoSorter Web Interface initialized. Enter a directory path and choose an
-                action.</span
-              >
-            </div>
+        <div class="log-container" id="logContainer">
+          <div class="log-entry">
+            <span class="log-timestamp">[Ready]</span>
+            <span>
+              PhotoSorter Web Interface initialized. Enter a directory path and choose an action.
+            </span>
           </div>
         </div>
       </div>

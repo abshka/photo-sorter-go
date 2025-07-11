@@ -20,6 +20,16 @@ type DateFormatOption struct {
 	Description string `json:"description"`
 }
 
+// CompressorConfig contains image compression settings
+// OutputDir is deprecated; compressed images are now saved to TargetDirectory.
+type CompressorConfig struct {
+	Enabled   bool     `mapstructure:"enabled"`
+	Quality   int      `mapstructure:"quality"`
+	Threshold float64  `mapstructure:"threshold"`
+	Formats   []string `mapstructure:"formats"`
+	// OutputDir string   `mapstructure:"output_dir"` // Deprecated
+}
+
 // Config represents the main configuration structure
 type Config struct {
 	SourceDirectory     string            `mapstructure:"source_directory" validate:"required"`
@@ -31,6 +41,7 @@ type Config struct {
 	Performance         PerformanceConfig `mapstructure:"performance"`
 	Security            SecurityConfig    `mapstructure:"security"`
 	Logging             LoggingConfig     `mapstructure:"logging"`
+	Compressor          CompressorConfig  `mapstructure:"compressor"`
 }
 
 // ProcessingConfig contains file processing settings
@@ -164,6 +175,13 @@ func DefaultConfig() *Config {
 			MaxBackups: 3,
 			MaxAge:     30,
 			Compress:   true,
+		},
+		Compressor: CompressorConfig{
+			Enabled:   true,
+			Quality:   85,
+			Threshold: 1.01,
+			Formats:   []string{".jpg", ".jpeg", ".png", ".webp"},
+			// OutputDir:         "./compressed", // Deprecated
 		},
 	}
 }

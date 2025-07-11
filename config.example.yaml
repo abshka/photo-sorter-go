@@ -25,11 +25,11 @@ supported_extensions:
   - ".png"
   - ".tiff"
   - ".tif"
-  - ".cr2"    # Canon RAW
-  - ".nef"    # Nikon RAW
-  - ".arw"    # Sony RAW
-  - ".dng"    # Digital Negative
-  - ".raw"    # Generic RAW
+  - ".cr2" # Canon RAW
+  - ".nef" # Nikon RAW
+  - ".arw" # Sony RAW
+  - ".dng" # Digital Negative
+  - ".raw" # Generic RAW
 
 # File processing settings
 processing:
@@ -67,7 +67,7 @@ video:
     - ".avi"
     - ".mov"
     - ".mpg"
-    - ".thm"    # Thumbnail files
+    - ".thm" # Thumbnail files
 
 # Performance tuning settings
 performance:
@@ -113,3 +113,16 @@ logging:
 
   # Compress old log files
   compress: true
+
+# Image compression settings
+compressor:
+  enabled: true # Enable or disable image compression
+  quality: 85 # JPEG/WebP quality (1-100)
+  threshold: 1.01 # If compressed file >= original * threshold, keep original
+  preserve_structure: true # Preserve folder structure for output
+  formats:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".webp"
+  output_dir: "./compressed" # Output directory for compressed images (relative or absolute)

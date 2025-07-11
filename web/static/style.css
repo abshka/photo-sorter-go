@@ -100,6 +100,25 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 40px;
   min-height: 500px;
+  min-width: 0; /* Prevent overflow for wide children */
+}
+
+.log-container {
+  background: #2d3748;
+  color: #e2e8f0;
+  padding: 25px;
+  border-radius: var(--border-radius);
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 13px;
+  max-height: 350px;
+  overflow-y: auto;
+  margin-top: 25px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  grid-column: 1 / -1; /* Span both columns */
+  width: 100%;
+  min-width: 0; /* Prevent overflow in grid */
+  box-sizing: border-box;
 }
 
 .section {
@@ -295,116 +314,7 @@ select.form-control {
   background: linear-gradient(135deg, var(--error-color) 0%, #c82333 100%);
 }
 
-.status-section {
-  grid-column: 1 / -1;
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.status-card {
-  background: white;
-  padding: 25px;
-  border-radius: var(--border-radius);
-  border-left: 4px solid var(--primary-color);
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition);
-  position: relative;
-  overflow: hidden;
-}
-
-.status-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-  border-radius: 0 0 0 40px;
-  opacity: 0.1;
-}
-
-.status-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-}
-
-.status-card h3 {
-  color: var(--dark-gray);
-  margin-bottom: 15px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-value {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: var(--primary-color);
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: var(--medium-gray);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 15px;
-  position: relative;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-  width: 0%;
-  transition: width 0.5s ease-out;
-  position: relative;
-}
-
-.progress-fill::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.log-container {
-  background: #2d3748;
-  color: #e2e8f0;
-  padding: 25px;
-  border-radius: var(--border-radius);
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  max-height: 350px;
-  overflow-y: auto;
-  margin-top: 25px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-  position: relative;
-}
+/* .log-container styles moved above and expanded for full width */
 
 .log-container::before {
   content: "";
@@ -586,6 +496,42 @@ select.form-control {
   }
 }
 
+/* Compression Results Table */
+.compression-results-table {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.compression-results-table th,
+.compression-results-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--medium-gray);
+}
+
+.compression-results-table td:first-child {
+  word-break: break-all;
+}
+
+.compression-results-table th {
+  background-color: var(--light-gray);
+  font-weight: 600;
+  color: var(--dark-gray);
+}
+
+.compression-results-table tr:nth-child(even) {
+  background-color: #fdfdfd;
+}
+
+.compression-results-table tr:hover {
+  background-color: var(--medium-gray);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   body {
@@ -613,6 +559,10 @@ select.form-control {
   .status-grid {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+
+  .compression-results-table {
+    font-size: 12px;
   }
 
   .status-card {

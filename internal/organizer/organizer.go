@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"photo-sorter-go/internal/compressor"
 	"photo-sorter-go/internal/config"
 	"photo-sorter-go/internal/extractor"
 	"photo-sorter-go/internal/statistics"
@@ -24,6 +25,7 @@ type FileOrganizer struct {
 	extractor  extractor.DateExtractor
 	workers    int
 	workerPool chan struct{}
+	compressor compressor.Compressor // Новый dependency для компрессии изображений
 }
 
 // FileInfo represents information about a file to be organized
@@ -47,7 +49,13 @@ type OrganizedFile struct {
 }
 
 // NewFileOrganizer creates a new file organizer
-func NewFileOrganizer(cfg *config.Config, logger *logrus.Logger, stats *statistics.Statistics, dateExtractor extractor.DateExtractor) *FileOrganizer {
+func NewFileOrganizer(
+	cfg *config.Config,
+	logger *logrus.Logger,
+	stats *statistics.Statistics,
+	dateExtractor extractor.DateExtractor,
+	compressor compressor.Compressor, // DI: внедрение компрессора
+) *FileOrganizer {
 	workers := cfg.Performance.WorkerThreads
 	if workers <= 0 {
 		workers = 4
@@ -60,6 +68,7 @@ func NewFileOrganizer(cfg *config.Config, logger *logrus.Logger, stats *statisti
 		extractor:  dateExtractor,
 		workers:    workers,
 		workerPool: make(chan struct{}, workers),
+		compressor: compressor,
 	}
 }
 
@@ -81,6 +90,8 @@ func (fo *FileOrganizer) OrganizeFiles() error {
 
 	fo.logger.Infof("Found %d media files to process", len(files))
 	fo.stats.TotalFilesFound = int64(len(files))
+
+	// (Image compression logic removed: sorting and compression are now fully independent.)
 
 	// Check dry run mode
 	if fo.config.Security.DryRun {

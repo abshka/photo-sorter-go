@@ -10,6 +10,7 @@ class PhotoSorterApp {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectInterval = 3000;
+    this._compressionPollInterval = null;
 
     this.initializeWebSocket();
     this.bindEvents();
@@ -65,7 +66,7 @@ class PhotoSorterApp {
       }
     };
 
-    this.ws.onerror = (error) => {
+    this.ws.onerror = () => {
       this.log("WebSocket error occurred", "error");
       this.isConnected = false;
       this.updateConnectionStatus(false);
@@ -117,6 +118,9 @@ class PhotoSorterApp {
     this.bindButton("stopBtn", () => this.stopOperation());
     this.bindButton("saveConfigBtn", () => this.saveConfig());
 
+    // Compression
+    this.bindButton("startCompressionBtn", () => this.startCompression());
+
     // Form inputs
     this.bindInput("sourceDir", (value) => this.validateSourceDirectory(value));
     this.bindInput("targetDir", (value) => this.validateTargetDirectory(value));
@@ -165,7 +169,9 @@ class PhotoSorterApp {
         try {
           validator(event.target.value);
           // Clear drop zone state when user types manually
-          this.clearDropZoneState(id);
+          if (typeof this.clearDropZoneState === "function") {
+            this.clearDropZoneState(id);
+          }
         } catch (error) {
           console.error("Input validation error:", error);
         }
@@ -237,6 +243,7 @@ class PhotoSorterApp {
       if (!this.isConnected) {
         this.updateStatus();
       }
+      this.updateCompressionStatus();
     }, 5000);
   }
 
@@ -319,7 +326,6 @@ class PhotoSorterApp {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ directory: sourceDir }),
       });
-
       const data = await response.json();
       if (data.success) {
         this.showAlert("Scan started successfully", "success");
@@ -420,6 +426,172 @@ class PhotoSorterApp {
   }
 
   /**
+   * Start image compression operation
+   */
+  async startCompression() {
+    // Собираем параметры из формы
+    const enabled = document.getElementById("compressionEnabled").checked;
+    if (!enabled) {
+      this.showAlert("Enable the compression checkbox to start.", "warning");
+      // Очищаем статус и статистику, если вдруг что-то осталось
+      this.updateElement("compressionStatus", "");
+      this.updateElement("compressionSummary", "");
+      return;
+    }
+    const quality = parseInt(document.getElementById("compressionQuality").value, 10) || 85;
+    const threshold = parseFloat(document.getElementById("compressionThreshold").value) || 1.01;
+    const formats = document
+      .getElementById("compressionFormats")
+      .value.split(",")
+      .map((f) => f.trim())
+      .filter(Boolean);
+
+    // Очищаем статус и результаты
+    this.updateElement("compressionStatus", "Starting compression...");
+    this.updateElement("compressionResults", "");
+
+    try {
+      // Use all parameters in the request body
+      const response = await fetch("/api/compress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quality,
+          threshold,
+          formats,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        this.updateElement("compressionStatus", "Compression started...");
+        this.pollCompressionStatus();
+      } else {
+        this.updateElement(
+          "compressionStatus",
+          "Failed to start compression: " + (data.error || data.message),
+        );
+      }
+    } catch (error) {
+      this.updateElement("compressionStatus", "Error: " + error.message);
+    }
+  }
+
+  /**
+   * Poll compression status periodically
+   */
+  pollCompressionStatus() {
+    if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
+    this._compressionPollInterval = setInterval(() => this.updateCompressionStatus(), 2000);
+    this.updateCompressionStatus(); // сразу
+  }
+
+  /**
+   * Update compression status/result from server
+   */
+  async updateCompressionStatus() {
+    try {
+      const response = await fetch("/api/compression-status");
+      const data = await response.json();
+      if (!data.success) {
+        this.updateElement(
+          "compressionStatus",
+          "Failed to get compression status: " + (data.error || data.message),
+        );
+        return;
+      }
+      const { running, results, error } = data.data || {};
+      if (running) {
+        this.updateElement("compressionStatus", "Compression in progress...");
+      } else if (error) {
+        this.updateElement("compressionStatus", "Compression error: " + error);
+        if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
+      } else if (results && results.length > 0) {
+        this.updateElement("compressionStatus", "Compression finished.");
+        // Статистика теперь выводится только через compressionSummary, таблица не используется
+        // Считаем только реально сжатые файлы (compressed/original)
+        let compressed = results.filter(
+          (r) =>
+            r.action === "compressed" ||
+            r.Action === "compressed" ||
+            r.action === "original" ||
+            r.Action === "original",
+        );
+        if (compressed.length === 0) {
+          this.updateElement("compressionSummary", "All files were skipped (already compressed).");
+        } else {
+          let origSize = 0,
+            compSize = 0;
+          for (const r of compressed) {
+            origSize += r.originalSize || r.OriginalSize || 0;
+            compSize += r.compressedSize || r.CompressedSize || 0;
+          }
+          let percent = origSize > 0 ? ((origSize - compSize) * 100) / origSize : 0;
+          const summary = [
+            `Original Size: ${this.formatSize(origSize)}`,
+            `Compressed Size: ${this.formatSize(compSize)}`,
+            `Saved (%): ${percent.toFixed(1)}`,
+          ].join("\n");
+          this.updateElement("compressionSummary", summary);
+        }
+        if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
+      } else {
+        this.updateElement("compressionStatus", "");
+        this.updateElement("compressionSummary", "");
+        if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
+      }
+    } catch (error) {
+      this.updateElement("compressionStatus", "Error: " + error.message);
+    }
+  }
+
+  /**
+   * Render compression results (теперь не используется, оставлено для совместимости)
+   */
+  renderCompressionResults(results) {
+    // Очищаем таблицу, выводим только текстовую статистику через compressionSummary
+    this.updateElement("compressionResults", "");
+    if (!Array.isArray(results) || results.length === 0) {
+      this.updateElement("compressionSummary", "");
+      return;
+    }
+    let origSize = 0,
+      compSize = 0;
+    for (const r of results) {
+      origSize += r.originalSize || r.OriginalSize || 0;
+      compSize += r.compressedSize || r.CompressedSize || 0;
+    }
+    let percent = origSize > 0 ? ((origSize - compSize) * 100) / origSize : 0;
+    const summary = [
+      `Original Size: ${this.formatBytes(origSize)}`,
+      `Compressed Size: ${this.formatBytes(compSize)}`,
+      `Saved (%): ${percent.toFixed(1)}`,
+    ].join("<br>");
+    this.updateElement("compressionSummary", summary);
+  }
+
+  /**
+   * Format file size in bytes
+   */
+  formatSize(size) {
+    if (!size || isNaN(size)) return "";
+    if (size < 1024) return size + " B";
+    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+    return (size / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  /**
+   * Escape HTML
+   */
+  escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  /**
    * Handle WebSocket messages
    */
   handleWebSocketMessage(message) {
@@ -442,11 +614,13 @@ class PhotoSorterApp {
         this.showAlert(`Scan failed: ${data.error}`, "error");
         break;
       case "organize_started":
-        const targetInfo = data.target_directory ? ` → ${data.target_directory}` : " (in place)";
-        this.log(
-          `Organization started (${data.dry_run ? "DRY RUN" : "LIVE"}) for: ${data.source_directory}${targetInfo}`,
-          "info",
-        );
+        {
+          const targetInfo = data.target_directory ? ` → ${data.target_directory}` : " (in place)";
+          this.log(
+            `Organization started (${data.dry_run ? "DRY RUN" : "LIVE"}) for: ${data.source_directory}${targetInfo}`,
+            "info",
+          );
+        }
         break;
       case "organize_completed":
         this.log("Organization completed successfully", "success");
@@ -455,6 +629,51 @@ class PhotoSorterApp {
       case "organize_error":
         this.log(`Organization error: ${data.error}`, "error");
         this.showAlert(`Organization failed: ${data.error}`, "error");
+        break;
+      case "compression_started":
+        this.log("Compression started", "info");
+        this.showAlert("Compression started...", "info");
+        break;
+      case "compression_completed":
+        {
+          let msg = "Compression finished";
+          if (typeof data.files_processed !== "undefined") {
+            msg += `: ${data.files_processed} files`;
+          }
+          if (
+            typeof data.original_size !== "undefined" &&
+            typeof data.compressed_size !== "undefined"
+          ) {
+            msg += ` | Original Size: ${this.formatSize(data.original_size)}, Compressed Size: ${this.formatSize(data.compressed_size)}`;
+          }
+          if (typeof data.percent_saved !== "undefined") {
+            msg += `, Saved: ${data.percent_saved.toFixed(1)}%`;
+          }
+          this.log(msg, "success");
+          // Если все файлы были skipped, выводим отдельное сообщение
+          if (
+            typeof data.files_processed === "number" &&
+            data.files_processed > 0 &&
+            (!data.original_size || !data.compressed_size || data.compressed_size === 0)
+          ) {
+            this.updateElement(
+              "compressionSummary",
+              "All files were skipped (already compressed).",
+            );
+          } else {
+            // Также выводим краткую статистику в compressionSummary
+            const summary = [
+              `Original Size: ${this.formatSize(data.original_size || 0)}`,
+              `Compressed Size: ${this.formatSize(data.compressed_size || 0)}`,
+              `Saved (%): ${typeof data.percent_saved === "number" ? data.percent_saved.toFixed(1) : "0.0"}`,
+            ].join("\n");
+            this.updateElement("compressionSummary", summary);
+          }
+        }
+        break;
+      case "compression_error":
+        this.log(`Compression error: ${data.error || ""}`, "error");
+        this.showAlert(`Compression failed: ${data.error || ""}`, "error");
         break;
       case "operation_stopped":
         this.log("Operation stopped by user", "info");
@@ -497,7 +716,11 @@ class PhotoSorterApp {
     }
 
     // Console logging for debugging
-    console[type === "error" ? "error" : "log"](`[PhotoSorter] ${message}`);
+    if (type === "error") {
+      console.error(`[PhotoSorter] ${message}`);
+    } else {
+      console.log(`[PhotoSorter] ${message}`);
+    }
   }
 
   /**
@@ -604,7 +827,7 @@ class PhotoSorterApp {
     const element = document.getElementById(id);
     if (!element) return;
 
-    if (content !== null) {
+    if (content !== null && content !== undefined) {
       element.textContent = content;
     }
 
@@ -812,6 +1035,10 @@ class PhotoSorterApp {
   cleanup() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.close();
+    }
+    if (this._compressionPollInterval) {
+      clearInterval(this._compressionPollInterval);
+      this._compressionPollInterval = null;
     }
   }
 }

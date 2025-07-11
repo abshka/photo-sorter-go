@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"photo-sorter-go/internal/compressor"
 	"photo-sorter-go/internal/config"
 	"photo-sorter-go/internal/extractor"
 	"photo-sorter-go/internal/logger"
@@ -154,7 +155,9 @@ func runOrganize(args []string) error {
 	stats := statistics.NewStatistics()
 	dateExtractor := extractor.NewEXIFExtractor(log)
 
-	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor)
+	// Создаем компрессор изображений и внедряем его в organizer
+	compressor := compressor.NewDefaultCompressor()
+	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor, compressor)
 
 	err = org.OrganizeFiles()
 	if err != nil {
@@ -192,7 +195,9 @@ func runScan(args []string) error {
 	stats := statistics.NewStatistics()
 	dateExtractor := extractor.NewEXIFExtractor(log)
 
-	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor)
+	// Создаем компрессор изображений и внедряем его в organizer
+	compressor := compressor.NewDefaultCompressor()
+	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor, compressor)
 
 	err = org.OrganizeFiles()
 	if err != nil {
@@ -239,6 +244,7 @@ func runServe() error {
 	// For web interface, create a minimal config if none exists
 	cfg, err := config.LoadConfig("")
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "CONFIG LOAD ERROR: %v\n", err)
 		// Use default config for web interface
 		cfg = config.DefaultConfig()
 		cfg.SourceDirectory = "."  // Default to current directory for web interface
@@ -246,7 +252,8 @@ func runServe() error {
 	}
 
 	log := setupLogger(cfg)
-	server := web.NewServer(cfg, log)
+	compressor := compressor.NewDefaultCompressor()
+	server := web.NewServer(cfg, log, compressor)
 
 	// Create a channel to listen for interrupt signals
 	sigChan := make(chan os.Signal, 1)

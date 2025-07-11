@@ -138,18 +138,6 @@ func (e *EXIFExtractor) extractWithGoExif(filePath string) (*time.Time, error) {
 	return nil, fmt.Errorf("no valid date found in EXIF using goexif")
 }
 
-// extractFileModTime extracts the file modification time as fallback
-func (e *EXIFExtractor) extractFileModTime(filePath string) (*time.Time, error) {
-	stat, err := os.Stat(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file stats: %w", err)
-	}
-
-	modTime := stat.ModTime()
-	e.logger.Debugf("Using file modification time: %v for file %s", modTime, filePath)
-	return &modTime, nil
-}
-
 // parseEXIFDateTime parses EXIF date time string
 func (e *EXIFExtractor) parseEXIFDateTime(dateStr string) *time.Time {
 	if dateStr == "" {
@@ -183,15 +171,6 @@ func (e *EXIFExtractor) getCacheKey(filePath string, fileInfo os.FileInfo) strin
 	return fmt.Sprintf("%s:%d:%d", filePath, fileInfo.Size(), fileInfo.ModTime().Unix())
 }
 
-func (e *EXIFExtractor) getCachedDate(filePath string) *time.Time {
-	// Legacy method - requires stat call
-	stat, err := os.Stat(filePath)
-	if err != nil {
-		return nil
-	}
-	return e.getCachedDateWithInfo(filePath, stat)
-}
-
 func (e *EXIFExtractor) getCachedDateWithInfo(filePath string, fileInfo os.FileInfo) *time.Time {
 	key := e.getCacheKey(filePath, fileInfo)
 	if value, ok := e.cache.Load(key); ok {
@@ -200,18 +179,6 @@ func (e *EXIFExtractor) getCachedDateWithInfo(filePath string, fileInfo os.FileI
 		}
 	}
 	return nil
-}
-
-func (e *EXIFExtractor) cacheDate(filePath string, date *time.Time) {
-	if date == nil {
-		return
-	}
-	// Legacy method - requires stat call
-	stat, err := os.Stat(filePath)
-	if err != nil {
-		return
-	}
-	e.cacheDateWithInfo(filePath, stat, date)
 }
 
 func (e *EXIFExtractor) cacheDateWithInfo(filePath string, fileInfo os.FileInfo, date *time.Time) {

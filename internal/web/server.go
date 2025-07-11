@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"photo-sorter-go/internal/compressor"
 	"photo-sorter-go/internal/config"
 	"photo-sorter-go/internal/extractor"
 	"photo-sorter-go/internal/organizer"
@@ -33,6 +34,15 @@ type Server struct {
 	operationMutex sync.RWMutex
 	isRunning      bool
 	currentStats   *statistics.Statistics
+
+	// --- Compression state ---
+	compressionMutex   sync.RWMutex
+	compressionRunning bool
+	compressionResults []compressor.CompressionResult
+	compressionError   string
+
+	// DI: Compressor
+	compressor compressor.Compressor
 }
 
 type APIResponse struct {
@@ -59,7 +69,7 @@ type WSMessage struct {
 	Data any    `json:"data"`
 }
 
-func NewServer(cfg *config.Config, log *logrus.Logger) *Server {
+func NewServer(cfg *config.Config, log *logrus.Logger, compressor compressor.Compressor) *Server {
 	s := &Server{
 		cfg:       cfg,
 		log:       log,
@@ -70,6 +80,7 @@ func NewServer(cfg *config.Config, log *logrus.Logger) *Server {
 				return true // Allow all origins in development
 			},
 		},
+		compressor: compressor,
 	}
 
 	s.setupRoutes()
@@ -88,6 +99,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/config", s.handleGetConfig).Methods("GET")
 	api.HandleFunc("/config", s.handleUpdateConfig).Methods("POST")
 	api.HandleFunc("/date-formats", s.handleGetDateFormats).Methods("GET")
+
+	// --- Compression endpoints ---
+	api.HandleFunc("/compress", s.handleCompress).Methods("POST")
+	api.HandleFunc("/compression-status", s.handleCompressionStatus).Methods("GET")
 
 	// WebSocket endpoint
 	s.router.HandleFunc("/ws", s.handleWebSocket)
@@ -238,17 +253,9 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	stats := s.currentStats
 	s.operationMutex.RUnlock()
 
-	if stats == nil {
-		s.writeJSON(w, APIResponse{
-			Success: true,
-			Data:    nil,
-		})
-		return
-	}
-
-	s.writeJSON(w, APIResponse{
-		Success: true,
-		Data: map[string]any{
+	var statsData any
+	if stats != nil {
+		statsData = map[string]any{
 			"summary": stats.GetSummary(),
 			"files": map[string]any{
 				"total_found":     atomic.LoadInt64(&stats.TotalFilesFound),
@@ -259,6 +266,143 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 				"skipped":         atomic.LoadInt64(&stats.FilesSkipped),
 				"errors":          atomic.LoadInt64(&stats.FilesWithErrors),
 			},
+		}
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    statsData,
+	})
+}
+
+// --- Compression API handlers ---
+
+// handleCompress запускает процесс сжатия изображений (асинхронно)
+func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
+	s.compressionMutex.Lock()
+	if s.compressionRunning {
+		s.compressionMutex.Unlock()
+		s.writeJSON(w, APIResponse{
+			Success: false,
+			Error:   "Compression already running",
+		})
+		return
+	}
+	s.compressionRunning = true
+	s.compressionResults = nil
+	s.compressionError = ""
+	s.compressionMutex.Unlock()
+
+	go s.runCompressionAsync()
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Message: "Image compression started",
+	})
+}
+
+// runCompressionAsync запускает компрессию в отдельной горутине
+func (s *Server) runCompressionAsync() {
+	// WebSocket: сообщаем о старте сжатия
+	s.broadcastWSMessage("compression_started", map[string]any{
+		"message":   "Image compression started",
+		"directory": s.cfg.SourceDirectory,
+	})
+
+	defer func() {
+		s.compressionMutex.Lock()
+		s.compressionRunning = false
+		s.compressionMutex.Unlock()
+	}()
+
+	// Получаем параметры из конфига
+	params := s.cfg.Compressor
+	s.log.Infof("runCompressionAsync called: enabled=%v, input=%v", params.Enabled, s.cfg.SourceDirectory)
+
+	if !params.Enabled {
+		s.log.Warn("Compression is disabled in config")
+		return
+	}
+
+	// Определяем целевую директорию для сжатых файлов (аналогично organizer)
+	targetDir := s.cfg.SourceDirectory
+	if s.cfg.TargetDirectory != nil && *s.cfg.TargetDirectory != "" {
+		targetDir = *s.cfg.TargetDirectory
+	}
+	compParams := compressor.CompressionParams{
+		InputPaths: []string{s.cfg.SourceDirectory},
+		TargetDir:  targetDir,
+		Quality:    params.Quality,
+		Threshold:  params.Threshold,
+		Formats:    params.Formats,
+	}
+
+	// Проверим, что директория существует и не пуста
+	if len(compParams.InputPaths) == 0 || compParams.InputPaths[0] == "" {
+		s.log.Warn("No input files for compression: input paths empty")
+		return
+	}
+	if _, err := os.Stat(compParams.InputPaths[0]); err != nil {
+		s.log.Warnf("Input directory does not exist or not accessible: %v", err)
+		return
+	}
+
+	s.log.Infof("Starting image compression: input=%v, targetDir=%s, quality=%d, threshold=%.2f, formats=%v",
+		s.cfg.SourceDirectory, targetDir, params.Quality, params.Threshold, params.Formats)
+
+	ctx := context.Background()
+	results, err := s.compressor.Compress(ctx, compParams)
+	s.compressionMutex.Lock()
+	defer s.compressionMutex.Unlock()
+	if err != nil {
+		s.compressionError = err.Error()
+		s.compressionResults = nil
+		s.log.Errorf("Image compression error: %v", err)
+		// WebSocket: сообщаем об ошибке сжатия
+		s.broadcastWSMessage("compression_error", map[string]any{
+			"error": err.Error(),
+		})
+	} else {
+		s.compressionResults = results
+		s.log.Infof("Image compression finished: %d files processed", len(results))
+		// WebSocket: сообщаем об успешном завершении сжатия
+		// Можно добавить краткую статистику
+		var origSize, compSize int64
+		for _, r := range results {
+			origSize += r.OriginalSize
+			compSize += r.CompressedSize
+		}
+		var percent float64
+		if origSize > 0 {
+			percent = float64(origSize-compSize) * 100 / float64(origSize)
+		}
+		s.broadcastWSMessage("compression_completed", map[string]any{
+			"files_processed": len(results),
+			"original_size":   origSize,
+			"compressed_size": compSize,
+			"percent_saved":   percent,
+			"message":         "Image compression finished",
+		})
+	}
+}
+
+// getCompressor возвращает экземпляр компрессора (можно заменить DI)
+// getCompressor больше не нужен, используем s.compressor напрямую
+
+// handleCompressionStatus возвращает статус/результаты компрессии
+func (s *Server) handleCompressionStatus(w http.ResponseWriter, r *http.Request) {
+	s.compressionMutex.RLock()
+	running := s.compressionRunning
+	results := s.compressionResults
+	errMsg := s.compressionError
+	s.compressionMutex.RUnlock()
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"running": running,
+			"results": results,
+			"error":   errMsg,
 		},
 	})
 }
@@ -372,10 +516,11 @@ func (s *Server) runScanAsync(directory string) {
 	// Create temporary config for scanning
 	cfg := *s.cfg
 	cfg.SourceDirectory = directory
+	// Always force dry-run for scan
 	cfg.Security.DryRun = true
 
 	dateExtractor := extractor.NewEXIFExtractor(s.log)
-	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor)
+	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor, s.compressor)
 
 	err := org.OrganizeFiles()
 
@@ -406,7 +551,7 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 		"dry_run":          req.DryRun,
 	})
 
-	// Create temporary config for organization
+	// Always use the DryRun value from the request, not from config defaults
 	cfg := *s.cfg
 	cfg.SourceDirectory = req.SourceDirectory
 	if req.TargetDirectory != "" {
@@ -422,8 +567,16 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 		cfg.Processing.MoveFiles = *req.MoveFiles
 	}
 
+	// Apply config overrides from request
+	if req.DateFormat != "" {
+		cfg.DateFormat = req.DateFormat
+	}
+	if req.MoveFiles != nil {
+		cfg.Processing.MoveFiles = *req.MoveFiles
+	}
+
 	dateExtractor := extractor.NewEXIFExtractor(s.log)
-	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor)
+	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor, s.compressor)
 
 	err := org.OrganizeFiles()
 
