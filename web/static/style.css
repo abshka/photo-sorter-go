@@ -143,6 +143,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-content: center;
+  text-align: center;
 }
 
 .form-group {
@@ -372,20 +374,14 @@ select.form-control {
 
 .log-entry.log-error {
   color: #ff6b6b;
-  border-left: 3px solid #ff6b6b;
-  padding-left: 10px;
 }
 
 .log-entry.log-success {
   color: #51cf66;
-  border-left: 3px solid #51cf66;
-  padding-left: 10px;
 }
 
 .log-entry.log-warning {
   color: #ffd43b;
-  border-left: 3px solid #ffd43b;
-  padding-left: 10px;
 }
 
 .d-none {

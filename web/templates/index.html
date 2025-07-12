@@ -46,8 +46,8 @@
         margin-bottom: 10px;
       }
       .actions-row .btn {
-        flex: 1 1 0;
-        min-width: 120px;
+        flex: 1 1 1;
+        min-width: 105px;
         max-width: 220px;
       }
       #compressionSummary {
@@ -100,7 +100,9 @@
             </select>
           </div>
 
-          <button type="button" class="btn" id="saveConfigBtn">💾 Save Configuration</button>
+          <div style="display: flex; justify-content: center;">
+            <button type="button" class="btn" id="saveConfigBtn">💾 Save Configuration</button>
+          </div>
         </div>
 
         <!-- Directory Selection -->
@@ -116,6 +118,7 @@
               placeholder="Enter full path: /home/user/Photos or C:\Users\User\Photos"
               title="Enter the complete absolute path to your photos folder"
               value="."
+              autocomplete="off"
             />
             <div class="path-help">
               <strong>💡 Examples:</strong>
@@ -147,7 +150,7 @@
           <h2>🗜️ Image Compression</h2>
           <div class="form-group">
             <label for="compressionEnabled">
-              <input type="checkbox" id="compressionEnabled" />
+              <input type="checkbox" id="compressionEnabled" checked />
               Enable Image Compression
             </label>
           </div>

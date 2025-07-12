@@ -113,13 +113,25 @@ class PhotoSorterApp {
    */
   bindEvents() {
     // Main action buttons
-    this.bindButton("scanBtn", () => this.scanDirectory());
-    this.bindButton("organizeBtn", () => this.organizePhotos());
+    this.bindButton("scanBtn", () => {
+      this.clearCompressionSummary();
+      this.stopCompressionPollingAndStatus();
+      this.scanDirectory();
+    });
+    this.bindButton("organizeBtn", () => {
+      this.clearCompressionSummary();
+      this.stopCompressionPollingAndStatus();
+      this.organizePhotos();
+    });
     this.bindButton("stopBtn", () => this.stopOperation());
     this.bindButton("saveConfigBtn", () => this.saveConfig());
 
     // Compression
-    this.bindButton("startCompressionBtn", () => this.startCompression());
+    this.bindButton("startCompressionBtn", () => {
+      this.clearCompressionSummary();
+      this.stopCompressionPollingAndStatus();
+      this.startCompression();
+    });
 
     // Form inputs
     this.bindInput("sourceDir", (value) => this.validateSourceDirectory(value));
@@ -132,6 +144,9 @@ class PhotoSorterApp {
     this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
 
     // Keyboard shortcuts
+
+    // Compression config change
+    this.bindCheckbox("compressionEnabled", () => this.updateConfigDisplay());
     this.bindKeyboardShortcuts();
 
     // Window events
@@ -328,7 +343,7 @@ class PhotoSorterApp {
       });
       const data = await response.json();
       if (data.success) {
-        this.showAlert("Scan started successfully", "success");
+        // this.showAlert("Scan started successfully", "success");
       } else {
         throw new Error(data.error || "Scan failed");
       }
@@ -396,7 +411,7 @@ class PhotoSorterApp {
 
       const data = await response.json();
       if (data.success) {
-        this.showAlert("Organization started successfully", "success");
+        // this.showAlert("Organization started successfully", "success");
       } else {
         throw new Error(data.error || "Organization failed");
       }
@@ -518,6 +533,7 @@ class PhotoSorterApp {
         );
         if (compressed.length === 0) {
           this.updateElement("compressionSummary", "All files were skipped (already compressed).");
+          this.autoClearCompressionSummary();
         } else {
           let origSize = 0,
             compSize = 0;
@@ -532,6 +548,7 @@ class PhotoSorterApp {
             `Saved (%): ${percent.toFixed(1)}`,
           ].join("\n");
           this.updateElement("compressionSummary", summary);
+          this.autoClearCompressionSummary();
         }
         if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
       } else {
@@ -606,7 +623,23 @@ class PhotoSorterApp {
         this.log(`Scan started for: ${data.directory}`, "info");
         break;
       case "scan_completed":
-        this.log("Scan completed successfully", "success");
+        // Попробуем извлечь количество найденных файлов из statistics, если оно есть
+        let filesFound = null;
+        if (data && data.statistics) {
+          // Ищем строку "Total Found: N" в summary
+          const match =
+            typeof data.statistics === "string"
+              ? data.statistics.match(/Total Found:\s*(\d+)/)
+              : null;
+          if (match) {
+            filesFound = parseInt(match[1], 10);
+          }
+        }
+        if (filesFound !== null) {
+          this.log(`Scan completed successfully. Files found: ${filesFound}`, "success");
+        } else {
+          this.log("Scan completed successfully", "success");
+        }
         this.showAlert("Scan completed!", "success");
         break;
       case "scan_error":
@@ -636,25 +669,43 @@ class PhotoSorterApp {
         break;
       case "compression_completed":
         {
+          // Для лога используем те же значения, что и в compressionSummary
+          let origSize = 0,
+            compSize = 0,
+            percent = 0;
+          if (Array.isArray(data.results) && data.results.length > 0) {
+            // Считаем только реально сжатые файлы (compressed/original)
+            let compressed = data.results.filter(
+              (r) =>
+                r.action === "compressed" ||
+                r.Action === "compressed" ||
+                r.action === "original" ||
+                r.Action === "original",
+            );
+            for (const r of compressed) {
+              origSize += r.originalSize || r.OriginalSize || 0;
+              compSize += r.compressedSize || r.CompressedSize || 0;
+            }
+            percent = origSize > 0 ? ((origSize - compSize) * 100) / origSize : 0;
+          } else if (
+            typeof data.original_size !== "undefined" &&
+            typeof data.compressed_size !== "undefined"
+          ) {
+            origSize = data.original_size;
+            compSize = data.compressed_size;
+            percent = typeof data.percent_saved === "number" ? data.percent_saved : 0;
+          }
           let msg = "Compression finished";
           if (typeof data.files_processed !== "undefined") {
             msg += `: ${data.files_processed} files`;
           }
-          if (
-            typeof data.original_size !== "undefined" &&
-            typeof data.compressed_size !== "undefined"
-          ) {
-            msg += ` | Original Size: ${this.formatSize(data.original_size)}, Compressed Size: ${this.formatSize(data.compressed_size)}`;
-          }
-          if (typeof data.percent_saved !== "undefined") {
-            msg += `, Saved: ${data.percent_saved.toFixed(1)}%`;
-          }
+          msg += ` | Original Size: ${this.formatSize(origSize)}, Compressed Size: ${this.formatSize(compSize)}, Saved: ${percent.toFixed(1)}%`;
           this.log(msg, "success");
           // Если все файлы были skipped, выводим отдельное сообщение
           if (
             typeof data.files_processed === "number" &&
             data.files_processed > 0 &&
-            (!data.original_size || !data.compressed_size || data.compressed_size === 0)
+            (!origSize || !compSize || compSize === 0)
           ) {
             this.updateElement(
               "compressionSummary",
@@ -663,11 +714,12 @@ class PhotoSorterApp {
           } else {
             // Также выводим краткую статистику в compressionSummary
             const summary = [
-              `Original Size: ${this.formatSize(data.original_size || 0)}`,
-              `Compressed Size: ${this.formatSize(data.compressed_size || 0)}`,
-              `Saved (%): ${typeof data.percent_saved === "number" ? data.percent_saved.toFixed(1) : "0.0"}`,
+              `Original Size: ${this.formatSize(origSize)}`,
+              `Compressed Size: ${this.formatSize(compSize)}`,
+              `Saved (%): ${percent.toFixed(1)}`,
             ].join("\n");
             this.updateElement("compressionSummary", summary);
+            this.autoClearCompressionSummary();
           }
         }
         break;
@@ -726,25 +778,27 @@ class PhotoSorterApp {
   /**
    * Show alert message
    */
+  // showAlert отключён для пользовательских действий
   showAlert(message, type) {
-    const alertsContainer = document.getElementById("alerts");
-    if (!alertsContainer) return;
+    // Оставляем только для ошибок валидации и критических ошибок
+    if (type === "error" || type === "warning") {
+      const alertsContainer = document.getElementById("alerts");
+      if (!alertsContainer) return;
 
-    const alert = document.createElement("div");
-    alert.className = `alert alert-${type}`;
-    alert.innerHTML = `
-      <span>${this.escapeHtml(message)}</span>
-      <button class="btn-close" onclick="this.parentElement.remove()"></button>
-    `;
+      const alert = document.createElement("div");
+      alert.className = `alert alert-${type}`;
+      alert.innerHTML = `
+        <span>${this.escapeHtml(message)}</span>
+        <button class="btn-close" onclick="this.parentElement.remove()"></button>
+      `;
 
-    alertsContainer.appendChild(alert);
+      alertsContainer.appendChild(alert);
 
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      if (alert.parentNode) {
-        alert.parentNode.removeChild(alert);
-      }
-    }, 5000);
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
   }
 
   // Utility methods
@@ -879,7 +933,35 @@ class PhotoSorterApp {
   }
 
   /**
-   * Get checkbox value
+   * Очищает compressionSummary
+   */
+  clearCompressionSummary() {
+    this.updateElement("compressionSummary", "");
+  }
+
+  /**
+   * Останавливает опрос compressionStatus и сбрасывает compressionStatus
+   */
+  stopCompressionPollingAndStatus() {
+    if (this._compressionPollInterval) {
+      clearInterval(this._compressionPollInterval);
+      this._compressionPollInterval = null;
+    }
+    this.updateElement("compressionStatus", "");
+  }
+
+  /**
+   * Очищает compressionSummary через 10 секунд
+   */
+  autoClearCompressionSummary() {
+    clearTimeout(this._compressionSummaryTimeout);
+    this._compressionSummaryTimeout = setTimeout(() => {
+      this.clearCompressionSummary();
+    }, 10000);
+  }
+
+  /**
+   * Load configuration from server
    */
   getCheckboxValue(id) {
     const element = document.getElementById(id);
@@ -970,7 +1052,7 @@ class PhotoSorterApp {
 
       const data = await response.json();
       if (data.success) {
-        this.showAlert("Configuration saved successfully", "success");
+        // this.showAlert("Configuration saved successfully", "success");
         this.log("Configuration saved", "info");
         this.updateConfigDisplay();
       } else {
@@ -990,6 +1072,9 @@ class PhotoSorterApp {
     const moveFiles = this.getCheckboxValue("moveFilesCheck");
     const duplicateHandling = this.getSelectValue("duplicateHandling");
     const dryRun = this.getCheckboxValue("dryRunCheck");
+    const compressionEnabled = document.getElementById("compressionEnabled")
+      ? document.getElementById("compressionEnabled").checked
+      : false;
 
     const formatName =
       {
@@ -1004,7 +1089,8 @@ class PhotoSorterApp {
       Format: ${formatName} |
       Action: ${moveFiles ? "Move" : "Copy"} |
       Duplicates: ${duplicateHandling} |
-      Mode: ${dryRun ? "Dry Run" : "Live"}
+      Mode: ${dryRun ? "Dry Run" : "Live"} |
+      Compression: ${compressionEnabled ? "On" : "Off"}
     `;
 
     this.updateElement("currentConfig", configText.trim());
