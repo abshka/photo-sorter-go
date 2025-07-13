@@ -1,6 +1,5 @@
-# PhotoSorter Go Makefile
+# Makefile for PhotoSorter Go project
 
-# Variables
 BINARY_NAME=photo-sorter
 BINARY_UNIX=$(BINARY_NAME)_unix
 BINARY_WINDOWS=$(BINARY_NAME).exe
@@ -9,7 +8,6 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
 LDFLAGS=-ldflags "-X 'main.version=$(VERSION)' -X 'main.buildTime=$(BUILD_TIME)'"
 
-# Go parameters
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
@@ -19,19 +17,15 @@ GOMOD=$(GOCMD) mod
 GOFMT=$(GOCMD) fmt
 GOVET=$(GOCMD) vet
 
-# Main source directory
 MAIN_PACKAGE=./cmd/photo-sorter
 
-# Default target
 .PHONY: all
 all: test build
 
-# Build the binary
 .PHONY: build
 build:
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) -v $(MAIN_PACKAGE)
 
-# Build for multiple platforms
 .PHONY: build-all
 build-all: build-linux build-windows build-darwin
 
@@ -47,7 +41,6 @@ build-windows:
 build-darwin:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_DARWIN) -v $(MAIN_PACKAGE)
 
-# Build for ARM architectures
 .PHONY: build-arm
 build-arm: build-linux-arm64 build-darwin-arm64
 
@@ -59,28 +52,23 @@ build-linux-arm64:
 build-darwin-arm64:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME)_darwin_arm64 -v $(MAIN_PACKAGE)
 
-# Run tests
 .PHONY: test
 test:
 	$(GOTEST) -v ./...
 
-# Run tests with coverage
 .PHONY: test-coverage
 test-coverage:
 	$(GOTEST) -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 
-# Run tests with race detection
 .PHONY: test-race
 test-race:
 	$(GOTEST) -race -v ./...
 
-# Run benchmarks
 .PHONY: bench
 bench:
 	$(GOTEST) -bench=. -benchmem ./...
 
-# Clean build artifacts
 .PHONY: clean
 clean:
 	$(GOCLEAN)
@@ -92,52 +80,42 @@ clean:
 	rm -f coverage.out
 	rm -f coverage.html
 
-# Run go mod tidy
 .PHONY: deps
 deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Format code
 .PHONY: fmt
 fmt:
 	$(GOFMT) ./...
 
-# Run go vet
 .PHONY: vet
 vet:
 	$(GOVET) ./...
 
-# Run golint (requires golint to be installed)
 .PHONY: lint
 lint:
 	golint ./...
 
-# Run all quality checks
 .PHONY: check
 check: fmt vet lint test
 
-# Install the binary
 .PHONY: install
 install: build
 	cp $(BINARY_NAME) /usr/local/bin/
 
-# Uninstall the binary
 .PHONY: uninstall
 uninstall:
 	rm -f /usr/local/bin/$(BINARY_NAME)
 
-# Run the application
 .PHONY: run
 run:
 	$(GOCMD) run $(MAIN_PACKAGE)
 
-# Run with example configuration
 .PHONY: run-example
 run-example:
 	$(GOCMD) run $(MAIN_PACKAGE) --config config.example.yaml --dry-run
 
-# Create release archives
 .PHONY: release
 release: build-all
 	mkdir -p release
@@ -145,24 +123,20 @@ release: build-all
 	zip -j release/$(BINARY_NAME)-$(VERSION)-windows-amd64.zip $(BINARY_WINDOWS) README.md config.example.yaml
 	tar -czf release/$(BINARY_NAME)-$(VERSION)-darwin-amd64.tar.gz $(BINARY_DARWIN) README.md config.example.yaml
 
-# Development setup
 .PHONY: dev-setup
 dev-setup:
 	$(GOGET) -u golang.org/x/lint/golint
 	$(GOGET) -u github.com/goreleaser/goreleaser
 
-# Docker build
 .PHONY: docker-build
 docker-build:
 	docker build -t photo-sorter:$(VERSION) .
 	docker tag photo-sorter:$(VERSION) photo-sorter:latest
 
-# Docker run
 .PHONY: docker-run
 docker-run:
 	docker run --rm -v $(PWD)/photos:/photos photo-sorter:latest
 
-# Show help
 .PHONY: help
 help:
 	@echo "Available targets:"
@@ -192,5 +166,4 @@ help:
 	@echo "  docker-run    - Run in Docker container"
 	@echo "  help          - Show this help message"
 
-# Default target when just running 'make'
 .DEFAULT_GOAL := help

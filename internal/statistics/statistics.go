@@ -7,9 +7,8 @@ import (
 	"time"
 )
 
-// Statistics holds all statistics for the photo sorting operation
+// Statistics contains all statistics for the photo sorting operation.
 type Statistics struct {
-	// File processing statistics (using atomic for thread safety)
 	TotalFilesFound     int64
 	TotalFilesProcessed int64
 	FilesOrganized      int64
@@ -19,7 +18,6 @@ type Statistics struct {
 	FilesWithErrors     int64
 	FilesWithoutDates   int64
 
-	// Video specific statistics (using atomic for thread safety)
 	VideoFilesFound     int64
 	VideoFilesProcessed int64
 	ThumbnailsFound     int64
@@ -27,13 +25,11 @@ type Statistics struct {
 	MPGTHMMerged        int64
 	MPGTHMErrors        int64
 
-	// Duplicate handling statistics (using atomic for thread safety)
 	DuplicatesFound    int64
 	DuplicatesRenamed  int64
 	DuplicatesSkipped  int64
 	DuplicatesReplaced int64
 
-	// Performance statistics
 	StartTime       time.Time
 	EndTime         time.Time
 	Duration        time.Duration
@@ -41,29 +37,23 @@ type Statistics struct {
 	BytesProcessed  int64
 	AverageFileSize int64
 
-	// Cache statistics (using atomic for thread safety)
 	CacheHits    int64
 	CacheMisses  int64
 	CacheHitRate float64
 
-	// Directory statistics (using atomic for thread safety)
 	DirectoriesCreated int64
 	DirectoriesScanned int64
 
-	// Error tracking
 	Errors []StatError
 
-	// Mutex only for complex operations that need synchronization
 	mutex sync.RWMutex
 
-	// File type breakdown
 	FileTypeStats map[string]int64
 
-	// Date extraction statistics
 	DateExtractionStats DateExtractionStats
 }
 
-// StatError represents an error that occurred during processing
+// StatError represents an error that occurred during processing.
 type StatError struct {
 	FilePath  string
 	Operation string
@@ -71,7 +61,7 @@ type StatError struct {
 	Timestamp time.Time
 }
 
-// DateExtractionStats holds statistics about date extraction methods
+// DateExtractionStats contains statistics about date extraction methods.
 type DateExtractionStats struct {
 	FromEXIF         int64
 	FromVideoMeta    int64
@@ -81,7 +71,7 @@ type DateExtractionStats struct {
 	ExtractionErrors int64
 }
 
-// NewStatistics creates a new statistics instance
+// NewStatistics returns a new Statistics instance.
 func NewStatistics() *Statistics {
 	return &Statistics{
 		StartTime:           time.Now(),
@@ -91,110 +81,122 @@ func NewStatistics() *Statistics {
 	}
 }
 
-// File processing methods
-
+// IncrementFilesFound increases the count of found files by 1.
 func (s *Statistics) IncrementFilesFound() {
 	atomic.AddInt64(&s.TotalFilesFound, 1)
 }
 
+// IncrementFilesProcessed increases the count of processed files by 1.
 func (s *Statistics) IncrementFilesProcessed() {
 	atomic.AddInt64(&s.TotalFilesProcessed, 1)
 }
 
+// IncrementFilesOrganized increases the count of organized files by 1.
 func (s *Statistics) IncrementFilesOrganized() {
 	atomic.AddInt64(&s.FilesOrganized, 1)
 }
 
+// IncrementFilesMoved increases the count of moved files by 1.
 func (s *Statistics) IncrementFilesMoved() {
 	atomic.AddInt64(&s.FilesMoved, 1)
 }
 
+// IncrementFilesCopied increases the count of copied files by 1.
 func (s *Statistics) IncrementFilesCopied() {
 	atomic.AddInt64(&s.FilesCopied, 1)
 }
 
+// IncrementFilesSkipped increases the count of skipped files by 1.
 func (s *Statistics) IncrementFilesSkipped() {
 	atomic.AddInt64(&s.FilesSkipped, 1)
 }
 
+// IncrementFilesWithErrors increases the count of files with errors by 1.
 func (s *Statistics) IncrementFilesWithErrors() {
 	atomic.AddInt64(&s.FilesWithErrors, 1)
 }
 
+// IncrementFilesWithoutDates increases the count of files without dates by 1.
 func (s *Statistics) IncrementFilesWithoutDates() {
 	atomic.AddInt64(&s.FilesWithoutDates, 1)
 }
 
-// Video processing methods
-
+// IncrementVideoFilesFound increases the count of found video files by 1.
 func (s *Statistics) IncrementVideoFilesFound() {
 	atomic.AddInt64(&s.VideoFilesFound, 1)
 }
 
+// IncrementVideoFilesProcessed increases the count of processed video files by 1.
 func (s *Statistics) IncrementVideoFilesProcessed() {
 	atomic.AddInt64(&s.VideoFilesProcessed, 1)
 }
 
+// IncrementThumbnailsFound increases the count of found thumbnails by 1.
 func (s *Statistics) IncrementThumbnailsFound() {
 	atomic.AddInt64(&s.ThumbnailsFound, 1)
 }
 
+// IncrementVideoPairsFound increases the count of found video pairs by 1.
 func (s *Statistics) IncrementVideoPairsFound() {
 	atomic.AddInt64(&s.VideoPairsFound, 1)
 }
 
+// IncrementMPGTHMMerged increases the count of merged MPG/THM pairs by 1.
 func (s *Statistics) IncrementMPGTHMMerged() {
 	atomic.AddInt64(&s.MPGTHMMerged, 1)
 }
 
+// IncrementMPGTHMErrors increases the count of MPG/THM errors by 1.
 func (s *Statistics) IncrementMPGTHMErrors() {
 	atomic.AddInt64(&s.MPGTHMErrors, 1)
 }
 
-// Duplicate handling methods
-
+// IncrementDuplicatesFound increases the count of found duplicates by 1.
 func (s *Statistics) IncrementDuplicatesFound() {
 	atomic.AddInt64(&s.DuplicatesFound, 1)
 }
 
+// IncrementDuplicatesRenamed increases the count of renamed duplicates by 1.
 func (s *Statistics) IncrementDuplicatesRenamed() {
 	atomic.AddInt64(&s.DuplicatesRenamed, 1)
 }
 
+// IncrementDuplicatesSkipped increases the count of skipped duplicates by 1.
 func (s *Statistics) IncrementDuplicatesSkipped() {
 	atomic.AddInt64(&s.DuplicatesSkipped, 1)
 }
 
+// IncrementDuplicatesReplaced increases the count of replaced duplicates by 1.
 func (s *Statistics) IncrementDuplicatesReplaced() {
 	atomic.AddInt64(&s.DuplicatesReplaced, 1)
 }
 
-// Directory methods
-
+// IncrementDirectoriesCreated increases the count of created directories by 1.
 func (s *Statistics) IncrementDirectoriesCreated() {
 	atomic.AddInt64(&s.DirectoriesCreated, 1)
 }
 
+// IncrementDirectoriesScanned increases the count of scanned directories by 1.
 func (s *Statistics) IncrementDirectoriesScanned() {
 	atomic.AddInt64(&s.DirectoriesScanned, 1)
 }
 
-// Cache methods
-
+// IncrementCacheHits increases the cache hit count by 1.
 func (s *Statistics) IncrementCacheHits() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.CacheHits++
 }
 
+// IncrementCacheMisses increases the cache miss count by 1.
 func (s *Statistics) IncrementCacheMisses() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.CacheMisses++
 }
 
+// UpdateCacheHitRate updates the cache hit rate based on current hits and misses.
 func (s *Statistics) UpdateCacheHitRate() {
-	// Use atomic loads for thread-safe reading
 	hits := atomic.LoadInt64(&s.CacheHits)
 	misses := atomic.LoadInt64(&s.CacheMisses)
 	total := hits + misses
@@ -203,58 +205,61 @@ func (s *Statistics) UpdateCacheHitRate() {
 	}
 }
 
-// Date extraction methods
-
+// IncrementDateFromEXIF increases the count of dates extracted from EXIF by 1.
 func (s *Statistics) IncrementDateFromEXIF() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.FromEXIF++
 }
 
+// IncrementDateFromVideoMeta increases the count of dates extracted from video metadata by 1.
 func (s *Statistics) IncrementDateFromVideoMeta() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.FromVideoMeta++
 }
 
+// IncrementDateFromThumbnail increases the count of dates extracted from thumbnails by 1.
 func (s *Statistics) IncrementDateFromThumbnail() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.FromThumbnail++
 }
 
+// IncrementDateFromFileName increases the count of dates extracted from filenames by 1.
 func (s *Statistics) IncrementDateFromFileName() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.FromFileName++
 }
 
+// IncrementDateFromModTime increases the count of dates extracted from modification time by 1.
 func (s *Statistics) IncrementDateFromModTime() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.FromModTime++
 }
 
+// IncrementDateExtractionErrors increases the count of date extraction errors by 1.
 func (s *Statistics) IncrementDateExtractionErrors() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.DateExtractionStats.ExtractionErrors++
 }
 
-// File type tracking
-
+// IncrementFileType increases the count for a specific file type by 1.
 func (s *Statistics) IncrementFileType(fileType string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.FileTypeStats[fileType]++
 }
 
-// Performance tracking
-
+// AddBytesProcessed adds the given number of bytes to the total bytes processed.
 func (s *Statistics) AddBytesProcessed(bytes int64) {
 	atomic.AddInt64(&s.BytesProcessed, bytes)
 }
 
+// Finalize calculates final statistics such as duration, files per second, and average file size.
 func (s *Statistics) Finalize() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -262,7 +267,6 @@ func (s *Statistics) Finalize() {
 	s.EndTime = time.Now()
 	s.Duration = s.EndTime.Sub(s.StartTime)
 
-	// Use atomic loads for thread-safe reading
 	totalProcessed := atomic.LoadInt64(&s.TotalFilesProcessed)
 	bytesProcessed := atomic.LoadInt64(&s.BytesProcessed)
 
@@ -277,8 +281,7 @@ func (s *Statistics) Finalize() {
 	s.UpdateCacheHitRate()
 }
 
-// Error tracking
-
+// AddError records an error that occurred during processing.
 func (s *Statistics) AddError(filePath, operation, errorMsg string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -291,58 +294,56 @@ func (s *Statistics) AddError(filePath, operation, errorMsg string) {
 	})
 }
 
-// Reporting methods
-
+// GetSummary returns a formatted summary of all statistics.
 func (s *Statistics) GetSummary() string {
-	// Use atomic loads for thread-safe reading
 	return fmt.Sprintf(`Photo Sorter Statistics Summary:
 
 Files:
-  Total Found: %d
-  Total Processed: %d
-  Organized: %d
-  Moved: %d
-  Copied: %d
-  Skipped: %d
-  Errors: %d
-  Without Dates: %d
+		Total Found: %d
+		Total Processed: %d
+		Organized: %d
+		Moved: %d
+		Copied: %d
+		Skipped: %d
+		Errors: %d
+		Without Dates: %d
 
 Videos:
-  Videos Found: %d
-  Videos Processed: %d
-  Thumbnails Found: %d
-  Video Pairs: %d
-  MPG/THM Merged: %d
-  MPG/THM Errors: %d
+		Videos Found: %d
+		Videos Processed: %d
+		Thumbnails Found: %d
+		Video Pairs: %d
+		MPG/THM Merged: %d
+		MPG/THM Errors: %d
 
 Duplicates:
-  Found: %d
-  Renamed: %d
-  Skipped: %d
-  Replaced: %d
+		Found: %d
+		Renamed: %d
+		Skipped: %d
+		Replaced: %d
 
 Performance:
-  Duration: %v
-  Files/Second: %.2f
-  Bytes Processed: %s
-  Average File Size: %s
+		Duration: %v
+		Files/Second: %.2f
+		Bytes Processed: %s
+		Average File Size: %s
 
 Cache:
-  Hits: %d
-  Misses: %d
-  Hit Rate: %.2f%%
+		Hits: %d
+		Misses: %d
+		Hit Rate: %.2f%%
 
 Date Extraction:
-  From EXIF: %d
-  From Video Metadata: %d
-  From Thumbnail: %d
-  From Filename: %d
-  From ModTime: %d
-  Extraction Errors: %d
+		From EXIF: %d
+		From Video Metadata: %d
+		From Thumbnail: %d
+		From Filename: %d
+		From ModTime: %d
+		Extraction Errors: %d
 
 Directories:
-  Created: %d
-  Scanned: %d`,
+		Created: %d
+		Scanned: %d`,
 		atomic.LoadInt64(&s.TotalFilesFound),
 		atomic.LoadInt64(&s.TotalFilesProcessed),
 		atomic.LoadInt64(&s.FilesOrganized),
@@ -378,6 +379,7 @@ Directories:
 		atomic.LoadInt64(&s.DirectoriesScanned))
 }
 
+// GetFileTypeBreakdown returns a formatted breakdown of file types processed.
 func (s *Statistics) GetFileTypeBreakdown() string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -393,6 +395,7 @@ func (s *Statistics) GetFileTypeBreakdown() string {
 	return result
 }
 
+// GetErrorSummary returns a summary of errors that occurred during processing.
 func (s *Statistics) GetErrorSummary() string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -403,7 +406,7 @@ func (s *Statistics) GetErrorSummary() string {
 
 	result := fmt.Sprintf("Errors (%d total):\n", len(s.Errors))
 	for i, err := range s.Errors {
-		if i >= 10 { // Limit to first 10 errors
+		if i >= 10 {
 			result += fmt.Sprintf("  ... and %d more errors\n", len(s.Errors)-10)
 			break
 		}
@@ -416,8 +419,7 @@ func (s *Statistics) GetErrorSummary() string {
 	return result
 }
 
-// Helper functions
-
+// formatBytes returns a human-readable string for a byte count.
 func formatBytes(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
@@ -431,32 +433,35 @@ func formatBytes(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// Thread-safe getters for key metrics
-
+// GetTotalFilesProcessed returns the total number of files processed.
 func (s *Statistics) GetTotalFilesProcessed() int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.TotalFilesProcessed
 }
 
+// GetFilesOrganized returns the total number of files organized.
 func (s *Statistics) GetFilesOrganized() int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.FilesOrganized
 }
 
+// GetFilesWithErrors returns the total number of files with errors.
 func (s *Statistics) GetFilesWithErrors() int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return int64(len(s.Errors))
 }
 
+// GetDuration returns the total duration of the operation.
 func (s *Statistics) GetDuration() time.Duration {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.Duration
 }
 
+// GetFilesPerSecond returns the average number of files processed per second.
 func (s *Statistics) GetFilesPerSecond() float64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()

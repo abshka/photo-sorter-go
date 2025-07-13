@@ -47,6 +47,7 @@ body {
   animation: fadeInUp 0.6s ease-out;
 }
 
+/* Animation for container fade in */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -100,7 +101,7 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 40px;
   min-height: 500px;
-  min-width: 0; /* Prevent overflow for wide children */
+  min-width: 0;
 }
 
 .log-container {
@@ -115,9 +116,9 @@ body {
   margin-top: 25px;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
   position: relative;
-  grid-column: 1 / -1; /* Span both columns */
+  grid-column: 1 / -1;
   width: 100%;
-  min-width: 0; /* Prevent overflow in grid */
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -316,8 +317,7 @@ select.form-control {
   background: linear-gradient(135deg, var(--error-color) 0%, #c82333 100%);
 }
 
-/* .log-container styles moved above and expanded for full width */
-
+/* Styles for log container and scrollbar */
 .log-container::before {
   content: "";
   position: absolute;
@@ -355,10 +355,11 @@ select.form-control {
   line-height: 1.4;
 }
 
+/* Animation for log entry fade in */
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateX(-10px);Golang
   }
   to {
     opacity: 1;
@@ -400,6 +401,7 @@ select.form-control {
   align-items: center;
 }
 
+/* Animation for alert slide in */
 @keyframes slideInRight {
   from {
     opacity: 0;
@@ -482,6 +484,7 @@ select.form-control {
   animation: pulse 1.5s infinite;
 }
 
+/* Animation for disconnected status pulse */
 @keyframes pulse {
   0%,
   100% {
@@ -492,7 +495,7 @@ select.form-control {
   }
 }
 
-/* Compression Results Table */
+/* Styles for compression results table */
 .compression-results-table {
   width: 100%;
   margin-top: 20px;
@@ -528,7 +531,7 @@ select.form-control {
   background-color: var(--medium-gray);
 }
 
-/* Responsive Design */
+/* Responsive design for tablets and below */
 @media (max-width: 768px) {
   body {
     padding: 10px;
@@ -576,10 +579,11 @@ select.form-control {
   }
 
   .form-control {
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
   }
 }
 
+/* Responsive design for mobile devices */
 @media (max-width: 480px) {
   .container {
     border-radius: var(--border-radius);
@@ -620,7 +624,7 @@ select.form-control {
   }
 }
 
-/* Reduced motion support */
+/* Reduced motion support for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

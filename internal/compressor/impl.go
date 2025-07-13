@@ -13,19 +13,20 @@ import (
 	"sync"
 	"time"
 
-	exiftool "github.com/barasher/go-exiftool"
+	"github.com/barasher/go-exiftool"
 	"github.com/disintegration/imaging"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
-// DefaultCompressor — базовая реализация интерфейса Compressor.
+// DefaultCompressor is the default implementation of the Compressor interface.
 type DefaultCompressor struct{}
 
-// NewDefaultCompressor создает новый экземпляр DefaultCompressor.
+// NewDefaultCompressor creates a new DefaultCompressor instance.
 func NewDefaultCompressor() *DefaultCompressor {
 	return &DefaultCompressor{}
 }
 
-// Compress реализует базовую логику компрессии изображений.
+// Compress performs image compression according to the provided parameters.
 func (c *DefaultCompressor) Compress(ctx context.Context, params CompressionParams) ([]CompressionResult, error) {
 	startGlobal := time.Now()
 	files, err := collectImageFiles(params.InputPaths, params.Formats)
@@ -36,14 +37,20 @@ func (c *DefaultCompressor) Compress(ctx context.Context, params CompressionPara
 		return nil, nil
 	}
 
-	// Создаем целевую директорию, если нужно (TargetDir)
+	filesToCompress, err := filterUncompressedImages(files, runtime.NumCPU())
+	if err != nil {
+		return nil, fmt.Errorf("filter uncompressed: %w", err)
+	}
+	if len(filesToCompress) == 0 {
+		return nil, nil
+	}
+
 	if params.TargetDir != "" {
 		if err := os.MkdirAll(params.TargetDir, 0755); err != nil {
 			return nil, fmt.Errorf("create target dir: %w", err)
 		}
 	}
 
-	// Worker pool
 	numWorkers := max(runtime.NumCPU(), 2)
 	type job struct {
 		index int
@@ -54,8 +61,8 @@ func (c *DefaultCompressor) Compress(ctx context.Context, params CompressionPara
 		res   CompressionResult
 	}
 
-	jobs := make(chan job, len(files))
-	results := make(chan result, len(files))
+	jobs := make(chan job, len(filesToCompress))
+	results := make(chan result, len(filesToCompress))
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -74,7 +81,7 @@ func (c *DefaultCompressor) Compress(ctx context.Context, params CompressionPara
 		}()
 	}
 
-	for i, path := range files {
+	for i, path := range filesToCompress {
 		jobs <- job{index: i, path: path}
 	}
 	close(jobs)
@@ -82,17 +89,16 @@ func (c *DefaultCompressor) Compress(ctx context.Context, params CompressionPara
 	wg.Wait()
 	close(results)
 
-	// Собираем результаты в правильном порядке
-	resArr := make([]CompressionResult, len(files))
+	resArr := make([]CompressionResult, len(filesToCompress))
 	for r := range results {
 		resArr[r.index] = r.res
 	}
 
-	_ = startGlobal // можно добавить в CompressionResult общее время, если потребуется
+	_ = startGlobal
 	return resArr, nil
 }
 
-// collectImageFiles рекурсивно собирает все файлы с поддерживаемыми расширениями.
+// collectImageFiles recursively collects all files with supported extensions.
 func collectImageFiles(inputPaths []string, formats []string) ([]string, error) {
 	var files []string
 	extSet := make(map[string]struct{})
@@ -101,7 +107,7 @@ func collectImageFiles(inputPaths []string, formats []string) ([]string, error) 
 	}
 	visit := func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // игнорируем ошибки доступа
+			return nil
 		}
 		if d.IsDir() {
 			return nil
@@ -129,7 +135,70 @@ func collectImageFiles(inputPaths []string, formats []string) ([]string, error) 
 	return files, nil
 }
 
-// compressOne сжимает один файл и возвращает CompressionResult.
+// filterUncompressedImages filters out files that already have Software=PhotoSorter in EXIF (JPEG/JPG).
+func filterUncompressedImages(files []string, numWorkers int) ([]string, error) {
+	type result struct {
+		path string
+		keep bool
+	}
+	jobs := make(chan string, len(files))
+	results := make(chan result, len(files))
+
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+	for w := 0; w < numWorkers; w++ {
+		go func() {
+			defer wg.Done()
+			for path := range jobs {
+				ext := strings.ToLower(filepath.Ext(path))
+				keep := true
+				if ext == ".jpg" || ext == ".jpeg" {
+					keep = !hasPhotoSorterSoftwareFlag(path)
+				}
+				results <- result{path: path, keep: keep}
+			}
+		}()
+	}
+	for _, path := range files {
+		jobs <- path
+	}
+	close(jobs)
+
+	wg.Wait()
+	close(results)
+
+	var filtered []string
+	for r := range results {
+		if r.keep {
+			filtered = append(filtered, r.path)
+		}
+	}
+	return filtered, nil
+}
+
+// hasPhotoSorterSoftwareFlag returns true if the EXIF Software tag contains "PhotoSorter".
+func hasPhotoSorterSoftwareFlag(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	x, err := exif.Decode(f)
+	if err != nil {
+		return false
+	}
+	tag, err := x.Get(exif.Software)
+	if err != nil {
+		return false
+	}
+	val, err := tag.StringVal()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(val, "PhotoSorter")
+}
+
+// compressOne compresses a single file and returns a CompressionResult.
 func compressOne(inputPath string, params CompressionParams) CompressionResult {
 	start := time.Now()
 	res := CompressionResult{
@@ -150,7 +219,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 	extOrig := filepath.Ext(inputPath)
 	ext := strings.ToLower(extOrig)
 
-	// --- Проверка метки PhotoSorter в EXIF (только для JPEG) ---
 	if ext == ".jpg" || ext == ".jpeg" {
 		hasMark, err := hasPhotoSorterMarkExiftool(inputPath)
 		if err == nil && hasMark {
@@ -162,7 +230,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 		}
 	}
 
-	// Открываем изображение
 	img, err := imaging.Open(inputPath)
 	if err != nil {
 		res.Action = "error"
@@ -173,7 +240,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 		return res
 	}
 
-	// Всегда сохраняем в TargetDir без структуры
 	outPath := filepath.Join(params.TargetDir, filepath.Base(inputPath))
 	if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
 		res.Action = "error"
@@ -184,24 +250,18 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 	}
 	res.OutputPath = outPath
 
-	// Сохраняем с нужным качеством
 	tmpPath := outPath + ".tmp"
-	// extOrig := filepath.Ext(inputPath)
 	var saveErr error
 
-	// Создаем буфер для сжатого изображения
 	var buf bytes.Buffer
-	// Кодируем изображение в JPEG с нужным качеством, не полагаясь на расширение файла
 	err = imaging.Encode(&buf, img, imaging.JPEG, imaging.JPEGQuality(params.Quality))
 	if err != nil {
 		saveErr = fmt.Errorf("encode error: %w", err)
 	} else {
-		// Записываем сжатые данные во временный файл
 		err = os.WriteFile(tmpPath, buf.Bytes(), 0644)
 		if err != nil {
 			saveErr = fmt.Errorf("write tmp file error: %w", err)
 		} else {
-			// Копируем EXIF только для оригинальных JPEG файлов и добавляем метку через exiftool
 			if strings.ToLower(extOrig) == ".jpg" || strings.ToLower(extOrig) == ".jpeg" {
 				exifErr := copyExifAndSetPhotoSorterMark(inputPath, tmpPath)
 				if exifErr != nil {
@@ -220,7 +280,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 		return res
 	}
 
-	// Сравниваем размеры
 	origSize := res.OriginalSize
 	compInfo, err := os.Stat(tmpPath)
 	if err != nil {
@@ -240,7 +299,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 		threshold = 1.01
 	}
 	if float64(compSize) >= float64(origSize)*threshold {
-		// Сохраняем оригинал
 		copyErr := copyFile(inputPath, outPath)
 		if copyErr != nil {
 			res.Action = "error"
@@ -256,7 +314,6 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 		res.PercentageSaved = 0
 		_ = os.Remove(tmpPath)
 	} else {
-		// Перемещаем tmp -> outPath
 		moveErr := os.Rename(tmpPath, outPath)
 		if moveErr != nil {
 			res.Action = "error"
@@ -274,7 +331,7 @@ func compressOne(inputPath string, params CompressionParams) CompressionResult {
 	return res
 }
 
-// copyFile копирует файл src -> dst.
+// copyFile copies file src to dst.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -295,19 +352,17 @@ func copyFile(src, dst string) error {
 	return out.Sync()
 }
 
-// ioCopy — алиас для io.Copy, чтобы не тянуть весь io пакет в начало.
+// ioCopy is an alias for io.Copy.
 func ioCopy(dst *os.File, src *os.File) (written int64, err error) {
 	return io.Copy(dst, src)
 }
 
-// copyExifAndSetPhotoSorterMark копирует EXIF из src в dst и устанавливает Software=PhotoSorter Compressed через exiftool.
+// copyExifAndSetPhotoSorterMark copies EXIF from src to dst and sets Software=PhotoSorter Compressed using exiftool.
 func copyExifAndSetPhotoSorterMark(src, dst string) error {
-	// Копируем EXIF из src в dst (через exiftool)
 	cmdCopy := exec.Command("exiftool", "-TagsFromFile", src, "-overwrite_original", dst)
 	if err := cmdCopy.Run(); err != nil {
 		return fmt.Errorf("exiftool copy failed: %v", err)
 	}
-	// Устанавливаем Software
 	cmdSet := exec.Command("exiftool", "-overwrite_original", "-Software=PhotoSorter Compressed", dst)
 	if err := cmdSet.Run(); err != nil {
 		return fmt.Errorf("exiftool set Software failed: %v", err)
@@ -315,7 +370,7 @@ func copyExifAndSetPhotoSorterMark(src, dst string) error {
 	return nil
 }
 
-// hasPhotoSorterMarkExiftool проверяет, есть ли в EXIF Software метка PhotoSorter через exiftool
+// hasPhotoSorterMarkExiftool checks if the EXIF Software tag contains "PhotoSorter" using exiftool.
 func hasPhotoSorterMarkExiftool(path string) (bool, error) {
 	et, err := exiftool.NewExiftool()
 	if err != nil {

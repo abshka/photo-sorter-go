@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EXIFExtractor extracts dates from image files using EXIF metadata
+// EXIFExtractor extracts dates from image files using EXIF metadata.
 type EXIFExtractor struct {
 	logger *logrus.Logger
 	cache  *sync.Map
@@ -21,7 +21,7 @@ type EXIFExtractor struct {
 	mutex  sync.RWMutex
 }
 
-// NewEXIFExtractor creates a new EXIF date extractor
+// NewEXIFExtractor returns a new EXIFExtractor.
 func NewEXIFExtractor(logger *logrus.Logger) *EXIFExtractor {
 	return &EXIFExtractor{
 		logger: logger,
@@ -30,20 +30,18 @@ func NewEXIFExtractor(logger *logrus.Logger) *EXIFExtractor {
 	}
 }
 
-// ExtractDate extracts the date from an image file using EXIF metadata
+// ExtractDate returns the date from an image file using EXIF metadata.
+// If EXIF data is not available, it falls back to the file modification time.
 func (e *EXIFExtractor) ExtractDate(filePath string) (*time.Time, error) {
-	// Check if file type is supported
 	if !e.SupportsFile(filePath) {
 		return nil, fmt.Errorf("file type not supported by extractor: %s", filePath)
 	}
 
-	// Get file info once for cache key and fallback
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	// Check cache first
 	if cachedDate := e.getCachedDateWithInfo(filePath, fileInfo); cachedDate != nil {
 		e.incrementCacheHits()
 		return cachedDate, nil
@@ -51,19 +49,17 @@ func (e *EXIFExtractor) ExtractDate(filePath string) (*time.Time, error) {
 
 	e.incrementCacheMisses()
 
-	// Try to extract using goexif
 	if date, err := e.extractWithGoExif(filePath); err == nil && date != nil {
 		e.cacheDateWithInfo(filePath, fileInfo, date)
 		return date, nil
 	}
 
-	// Final fallback to file modification time (using already retrieved fileInfo)
 	modTime := fileInfo.ModTime()
 	e.cacheDateWithInfo(filePath, fileInfo, &modTime)
 	return &modTime, nil
 }
 
-// SupportsFile checks if the file is supported by this extractor
+// SupportsFile reports whether the file is supported by this extractor.
 func (e *EXIFExtractor) SupportsFile(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	supportedExts := []string{".jpg", ".jpeg", ".png", ".tiff", ".tif", ".cr2", ".nef", ".arw", ".dng", ".raw"}
@@ -71,12 +67,12 @@ func (e *EXIFExtractor) SupportsFile(filePath string) bool {
 	return slices.Contains(supportedExts, ext)
 }
 
-// GetPriority returns the priority of this extractor
+// GetPriority returns the priority of this extractor.
 func (e *EXIFExtractor) GetPriority() int {
-	return 100 // High priority for EXIF data
+	return 100
 }
 
-// ClearCache clears the internal cache
+// ClearCache removes all entries from the internal cache and resets statistics.
 func (e *EXIFExtractor) ClearCache() {
 	e.cache = &sync.Map{}
 	e.mutex.Lock()
@@ -84,7 +80,7 @@ func (e *EXIFExtractor) ClearCache() {
 	e.mutex.Unlock()
 }
 
-// GetCacheStats returns cache statistics
+// GetCacheStats returns cache statistics for this extractor.
 func (e *EXIFExtractor) GetCacheStats() CacheStats {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -96,7 +92,7 @@ func (e *EXIFExtractor) GetCacheStats() CacheStats {
 	return stats
 }
 
-// extractWithGoExif extracts date using rwcarlsen/goexif library
+// extractWithGoExif extracts the date using the rwcarlsen/goexif library.
 func (e *EXIFExtractor) extractWithGoExif(filePath string) (*time.Time, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -109,13 +105,11 @@ func (e *EXIFExtractor) extractWithGoExif(filePath string) (*time.Time, error) {
 		return nil, fmt.Errorf("failed to decode EXIF: %w", err)
 	}
 
-	// Try to get DateTime first
 	if tm, err := x.DateTime(); err == nil {
 		e.logger.Debugf("Extracted DateTime from EXIF: %v for file %s", tm, filePath)
 		return &tm, nil
 	}
 
-	// Try DateTimeOriginal
 	if field, err := x.Get(exif.DateTimeOriginal); err == nil {
 		if dateStr, err := field.StringVal(); err == nil {
 			if date := e.parseEXIFDateTime(dateStr); date != nil {
@@ -125,7 +119,6 @@ func (e *EXIFExtractor) extractWithGoExif(filePath string) (*time.Time, error) {
 		}
 	}
 
-	// Try DateTimeDigitized
 	if field, err := x.Get(exif.DateTimeDigitized); err == nil {
 		if dateStr, err := field.StringVal(); err == nil {
 			if date := e.parseEXIFDateTime(dateStr); date != nil {
@@ -138,20 +131,20 @@ func (e *EXIFExtractor) extractWithGoExif(filePath string) (*time.Time, error) {
 	return nil, fmt.Errorf("no valid date found in EXIF using goexif")
 }
 
-// parseEXIFDateTime parses EXIF date time string
+// parseEXIFDateTime parses an EXIF date time string and returns a time.Time pointer.
+// Returns nil if parsing fails.
 func (e *EXIFExtractor) parseEXIFDateTime(dateStr string) *time.Time {
 	if dateStr == "" {
 		return nil
 	}
 
-	// Common EXIF date formats
 	formats := []string{
-		"2006:01:02 15:04:05", // Standard EXIF format
-		"2006-01-02 15:04:05", // Alternative format
-		"2006:01:02",          // Date only
-		"2006-01-02",          // Date only alternative
-		time.RFC3339,          // ISO 8601
-		time.RFC3339Nano,      // ISO 8601 with nanoseconds
+		"2006:01:02 15:04:05",
+		"2006-01-02 15:04:05",
+		"2006:01:02",
+		"2006-01-02",
+		time.RFC3339,
+		time.RFC3339Nano,
 	}
 
 	for _, format := range formats {
@@ -164,13 +157,12 @@ func (e *EXIFExtractor) parseEXIFDateTime(dateStr string) *time.Time {
 	return nil
 }
 
-// Cache methods
-
+// getCacheKey returns a cache key for the given file path and file info.
 func (e *EXIFExtractor) getCacheKey(filePath string, fileInfo os.FileInfo) string {
-	// Include file size and mod time in cache key to detect changes
 	return fmt.Sprintf("%s:%d:%d", filePath, fileInfo.Size(), fileInfo.ModTime().Unix())
 }
 
+// getCachedDateWithInfo returns the cached date for the given file path and file info, or nil if not found.
 func (e *EXIFExtractor) getCachedDateWithInfo(filePath string, fileInfo os.FileInfo) *time.Time {
 	key := e.getCacheKey(filePath, fileInfo)
 	if value, ok := e.cache.Load(key); ok {
@@ -181,6 +173,7 @@ func (e *EXIFExtractor) getCachedDateWithInfo(filePath string, fileInfo os.FileI
 	return nil
 }
 
+// cacheDateWithInfo stores the date in the cache for the given file path and file info.
 func (e *EXIFExtractor) cacheDateWithInfo(filePath string, fileInfo os.FileInfo, date *time.Time) {
 	if date == nil {
 		return
@@ -190,6 +183,7 @@ func (e *EXIFExtractor) cacheDateWithInfo(filePath string, fileInfo os.FileInfo,
 	e.cache.Store(key, *date)
 }
 
+// incrementCacheHits increments the cache hit counter.
 func (e *EXIFExtractor) incrementCacheHits() {
 	e.mutex.Lock()
 	e.stats.Hits++
@@ -197,6 +191,7 @@ func (e *EXIFExtractor) incrementCacheHits() {
 	e.mutex.Unlock()
 }
 
+// incrementCacheMisses increments the cache miss counter.
 func (e *EXIFExtractor) incrementCacheMisses() {
 	e.mutex.Lock()
 	e.stats.Misses++

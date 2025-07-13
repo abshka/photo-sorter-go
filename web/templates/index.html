@@ -6,7 +6,7 @@
     <title>PhotoSorter - Web Interface</title>
     <link rel="stylesheet" href="/static/style.css" />
     <style>
-      /* Styles for compression results table */
+      /* Main styles for compression results table */
       #compressionStatus,
       #compressionResults {
         margin-top: 15px;
@@ -15,7 +15,7 @@
         width: 100%;
         font-size: 14px;
         border-collapse: collapse;
-        table-layout: fixed; /* Helps with long paths */
+        table-layout: fixed;
       }
       #compressionResults th,
       #compressionResults td {
@@ -28,7 +28,7 @@
         background-color: var(--light-gray);
         font-weight: 600;
       }
-      /* Ensure file paths break correctly */
+      /* Ensure file paths break correctly in first colum */
       #compressionResults td:first-child {
         word-break: break-all;
         font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
@@ -71,7 +71,7 @@
       </div>
 
       <div class="main-content">
-        <!-- Configuration -->
+        <!-- Configuration section -->
         <div class="section">
           <h2>⚙️ Configuration</h2>
 
@@ -105,7 +105,7 @@
           </div>
         </div>
 
-        <!-- Directory Selection -->
+        <!-- Directory Selection section -->
         <div class="section">
           <h2>📁 Directory Selection</h2>
 
@@ -145,7 +145,7 @@
           </div>
         </div>
 
-        <!-- Image Compression -->
+        <!-- Image Compression section -->
         <div class="section" id="compressionSection">
           <h2>🗜️ Image Compression</h2>
           <div class="form-group">
@@ -203,14 +203,11 @@
           <div id="compressionResults"></div>
         </div>
 
-        <!-- Actions -->
+        <!-- Actions section -->
         <div class="section">
           <h2>⚡ Actions</h2>
 
-          <div class="checkbox-group">
-            <input type="checkbox" id="dryRunCheck" checked />
-            <label for="dryRunCheck">Dry Run (preview only)</label>
-          </div>
+
 
           <div class="config-info">
             <strong>Current Config:</strong>
@@ -219,9 +216,9 @@
 
           <div class="actions-center" style="margin-top: 20px">
             <div class="actions-row" style="margin-top: 20px">
-              <button type="button" class="btn" id="scanBtn">🔍 Scan</button>
-              <button type="button" class="btn" id="organizeBtn">📋 Organize</button>
-              <button type="button" class="btn" id="startCompressionBtn">🗜️ Compress</button>
+              <button type="button" class="btn" id="scanBtn" title="Scan: Preview what will be organized. No changes will be made.">🔍 Scan</button>
+              <button type="button" class="btn" id="organizeBtn" title="Organize: Move/copy files according to settings. You will be asked for confirmation.">📋 Organize</button>
+              <button type="button" class="btn" id="startCompressionBtn" title="Compress: Reduce image size for supported formats. No changes will be made unless compression is enabled.">🗜️ Compress</button>
               <button type="button" class="btn btn-danger d-none" id="stopBtn">⏹️ Stop</button>
             </div>
             <div id="compressionSummary"></div>

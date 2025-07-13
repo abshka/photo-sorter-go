@@ -34,7 +34,7 @@ var (
 	port      int
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd is the base command for the CLI.
 var rootCmd = &cobra.Command{
 	Use:   "photo-sorter",
 	Short: "Automatically organize photos and videos by date",
@@ -55,7 +55,7 @@ Features:
 	},
 }
 
-// scanCmd represents the scan command
+// scanCmd scans a directory and shows statistics without organizing files.
 var scanCmd = &cobra.Command{
 	Use:   "scan [directory]",
 	Short: "Scan directory and show statistics without organizing files",
@@ -67,7 +67,7 @@ This is useful for understanding what files would be processed.`,
 	},
 }
 
-// testExifCmd represents the test-exif command
+// testExifCmd tests EXIF extraction on a specific file.
 var testExifCmd = &cobra.Command{
 	Use:   "test-exif <file>",
 	Short: "Test EXIF extraction on a specific file",
@@ -79,7 +79,7 @@ This is useful for debugging date extraction issues.`,
 	},
 }
 
-// serveCmd represents the serve command
+// serveCmd starts the web interface server.
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start web interface server",
@@ -99,32 +99,26 @@ Access the interface at http://localhost:<port> (default: 8080)`,
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "enable verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&quiet, "quiet", false, "suppress non-error output")
 
-	// Root command flags
 	rootCmd.Flags().StringVar(&sourceDir, "source", "", "source directory containing media files")
 	rootCmd.Flags().StringVar(&targetDir, "target", "", "target directory for organized files (default: organize in place)")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "simulate organization without making changes")
 
-	// Serve command flags
 	serveCmd.Flags().IntVar(&port, "port", 8080, "port to run web server on")
 
-	// Add subcommands
 	rootCmd.AddCommand(scanCmd)
 	rootCmd.AddCommand(testExifCmd)
 	rootCmd.AddCommand(serveCmd)
 }
 
-// initConfig reads in config file and ENV variables
+// initConfig loads configuration file and environment variables.
 func initConfig() {
 	if cfgFile != "" {
-		// Use config file from the flag
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Search config in current directory, home directory, and /etc
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath(".")
@@ -132,21 +126,20 @@ func initConfig() {
 		viper.AddConfigPath("/etc/photo-sorter")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
 	}
 }
 
+// runOrganize executes the main organization logic.
 func runOrganize(args []string) error {
 	cfg, err := loadConfig(args)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Override dry-run if flag is set
 	if dryRun {
 		cfg.Security.DryRun = true
 	}
@@ -155,7 +148,6 @@ func runOrganize(args []string) error {
 	stats := statistics.NewStatistics()
 	dateExtractor := extractor.NewEXIFExtractor(log)
 
-	// Создаем компрессор изображений и внедряем его в organizer
 	compressor := compressor.NewDefaultCompressor()
 	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor, compressor)
 
@@ -164,7 +156,6 @@ func runOrganize(args []string) error {
 		return fmt.Errorf("organization failed: %w", err)
 	}
 
-	// Print statistics
 	if !quiet {
 		fmt.Println("\n" + stats.GetSummary())
 	}
@@ -172,22 +163,20 @@ func runOrganize(args []string) error {
 	return nil
 }
 
+// runScan scans the directory and prints statistics.
 func runScan(args []string) error {
 	cfg, err := loadConfig(args)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// For scan command, determine the source directory
 	scanDir := cfg.SourceDirectory
 	if len(args) > 0 {
-		// Use directory from command line argument if provided
 		scanDir = args[0]
 	}
 
-	// Update config with scan directory
 	cfg.SourceDirectory = scanDir
-	cfg.Security.DryRun = true // Scan is always dry-run
+	cfg.Security.DryRun = true
 
 	fmt.Fprintf(os.Stderr, "Scanning directory: %s\n", scanDir)
 
@@ -195,7 +184,6 @@ func runScan(args []string) error {
 	stats := statistics.NewStatistics()
 	dateExtractor := extractor.NewEXIFExtractor(log)
 
-	// Создаем компрессор изображений и внедряем его в organizer
 	compressor := compressor.NewDefaultCompressor()
 	org := organizer.NewFileOrganizer(cfg, log, stats, dateExtractor, compressor)
 
@@ -204,7 +192,6 @@ func runScan(args []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	// Print scan results
 	if !quiet {
 		fmt.Println("\n==================================================")
 		fmt.Println("SCAN RESULTS")
@@ -215,6 +202,7 @@ func runScan(args []string) error {
 	return nil
 }
 
+// runTestExif tests EXIF extraction for a given file.
 func runTestExif(filePath string) error {
 	if !fileExists(filePath) {
 		return fmt.Errorf("file does not exist: %s", filePath)
@@ -240,26 +228,23 @@ func runTestExif(filePath string) error {
 	return nil
 }
 
+// runServe starts the web server and handles graceful shutdown.
 func runServe() error {
-	// For web interface, create a minimal config if none exists
 	cfg, err := config.LoadConfig("")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "CONFIG LOAD ERROR: %v\n", err)
-		// Use default config for web interface
 		cfg = config.DefaultConfig()
-		cfg.SourceDirectory = "."  // Default to current directory for web interface
-		cfg.Security.DryRun = true // Safe default for web interface
+		cfg.SourceDirectory = "."
+		cfg.Security.DryRun = true
 	}
 
 	log := setupLogger(cfg)
 	compressor := compressor.NewDefaultCompressor()
 	server := web.NewServer(cfg, log, compressor)
 
-	// Create a channel to listen for interrupt signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Start server in a goroutine
 	go func() {
 		if err := server.Start(port); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
@@ -270,15 +255,12 @@ func runServe() error {
 	fmt.Printf("📱 Open your browser and go to: http://localhost:%d\n", port)
 	fmt.Printf("🛑 Press Ctrl+C to stop the server\n\n")
 
-	// Wait for interrupt signal
 	<-sigChan
 	fmt.Println("\n🛑 Shutting down server...")
 
-	// Create a context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Shutdown the server
 	if err := server.Stop(ctx); err != nil {
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
@@ -287,33 +269,29 @@ func runServe() error {
 	return nil
 }
 
+// loadConfig loads configuration and applies CLI overrides.
 func loadConfig(args []string) (*config.Config, error) {
 	cfg, err := config.LoadConfig("")
 	if err != nil {
 		return nil, err
 	}
 
-	// Override source directory if provided via flag
 	if sourceDir != "" {
 		cfg.SourceDirectory = sourceDir
 	}
 
-	// Override target directory if provided via flag
 	if targetDir != "" {
 		cfg.TargetDirectory = &targetDir
 	}
 
-	// If no source directory is set and we have args, use the first arg
 	if cfg.SourceDirectory == "" && len(args) > 0 {
 		cfg.SourceDirectory = args[0]
 	}
 
-	// Default to current directory if no source is specified
 	if cfg.SourceDirectory == "" {
 		cfg.SourceDirectory = "."
 	}
 
-	// Validate source directory exists
 	if !dirExists(cfg.SourceDirectory) {
 		return nil, fmt.Errorf("source directory does not exist: %s", cfg.SourceDirectory)
 	}
@@ -321,8 +299,8 @@ func loadConfig(args []string) (*config.Config, error) {
 	return cfg, nil
 }
 
+// setupLogger configures and returns a logger.
 func setupLogger(cfg *config.Config) *logrus.Logger {
-	// Create logger config
 	loggerCfg := logger.LoggerConfig{
 		Level:      cfg.Logging.Level,
 		FilePath:   cfg.Logging.FilePath,
@@ -333,7 +311,6 @@ func setupLogger(cfg *config.Config) *logrus.Logger {
 		Console:    !quiet,
 	}
 
-	// Override log level based on flags
 	if verbose {
 		loggerCfg.Level = "debug"
 	}
@@ -343,7 +320,6 @@ func setupLogger(cfg *config.Config) *logrus.Logger {
 
 	log, err := logger.NewLogger(loggerCfg)
 	if err != nil {
-		// Fallback to basic logger
 		log = logrus.New()
 		log.SetLevel(logrus.InfoLevel)
 	}
@@ -351,11 +327,13 @@ func setupLogger(cfg *config.Config) *logrus.Logger {
 	return log
 }
 
+// fileExists returns true if the given path exists and is a file.
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
 }
 
+// dirExists returns true if the given path exists and is a directory.
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()

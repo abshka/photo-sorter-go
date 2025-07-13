@@ -16,11 +16,14 @@ import (
 	"photo-sorter-go/internal/organizer"
 	"photo-sorter-go/internal/statistics"
 
+	"strings"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
+// Server represents the main web server and its state.
 type Server struct {
 	cfg        *config.Config
 	log        *logrus.Logger
@@ -30,21 +33,19 @@ type Server struct {
 	wsClients  map[*websocket.Conn]bool
 	wsMutex    sync.RWMutex
 
-	// Current operation state
 	operationMutex sync.RWMutex
 	isRunning      bool
 	currentStats   *statistics.Statistics
 
-	// --- Compression state ---
 	compressionMutex   sync.RWMutex
 	compressionRunning bool
 	compressionResults []compressor.CompressionResult
 	compressionError   string
 
-	// DI: Compressor
 	compressor compressor.Compressor
 }
 
+// APIResponse is the standard API response structure.
 type APIResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
@@ -52,10 +53,12 @@ type APIResponse struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// ScanRequest represents a scan request payload.
 type ScanRequest struct {
 	Directory string `json:"directory"`
 }
 
+// OrganizeRequest represents an organize request payload.
 type OrganizeRequest struct {
 	SourceDirectory string `json:"source_directory"`
 	TargetDirectory string `json:"target_directory,omitempty"`
@@ -64,11 +67,13 @@ type OrganizeRequest struct {
 	MoveFiles       *bool  `json:"move_files,omitempty"`
 }
 
+// WSMessage is the structure for WebSocket messages.
 type WSMessage struct {
 	Type string `json:"type"`
 	Data any    `json:"data"`
 }
 
+// NewServer creates a new Server instance.
 func NewServer(cfg *config.Config, log *logrus.Logger, compressor compressor.Compressor) *Server {
 	s := &Server{
 		cfg:       cfg,
@@ -77,7 +82,7 @@ func NewServer(cfg *config.Config, log *logrus.Logger, compressor compressor.Com
 		wsClients: make(map[*websocket.Conn]bool),
 		wsUpgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // Allow all origins in development
+				return true
 			},
 		},
 		compressor: compressor,
@@ -87,8 +92,8 @@ func NewServer(cfg *config.Config, log *logrus.Logger, compressor compressor.Com
 	return s
 }
 
+// setupRoutes configures all HTTP and WebSocket routes.
 func (s *Server) setupRoutes() {
-	// API routes
 	api := s.router.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/status", s.handleStatus).Methods("GET")
 	api.HandleFunc("/scan", s.handleScan).Methods("POST")
@@ -100,22 +105,19 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/config", s.handleUpdateConfig).Methods("POST")
 	api.HandleFunc("/date-formats", s.handleGetDateFormats).Methods("GET")
 
-	// --- Compression endpoints ---
 	api.HandleFunc("/compress", s.handleCompress).Methods("POST")
 	api.HandleFunc("/compression-status", s.handleCompressionStatus).Methods("GET")
 
-	// WebSocket endpoint
 	s.router.HandleFunc("/ws", s.handleWebSocket)
 
-	// Static files
 	s.router.PathPrefix("/static/").Handler(
 		http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))),
 	)
 
-	// Main page
 	s.router.HandleFunc("/", s.handleIndex).Methods("GET")
 }
 
+// Start launches the HTTP server on the specified port.
 func (s *Server) Start(port int) error {
 	addr := fmt.Sprintf(":%d", port)
 	s.httpServer = &http.Server{
@@ -130,6 +132,7 @@ func (s *Server) Start(port int) error {
 	return s.httpServer.ListenAndServe()
 }
 
+// Stop gracefully shuts down the HTTP server.
 func (s *Server) Stop(ctx context.Context) error {
 	if s.httpServer != nil {
 		return s.httpServer.Shutdown(ctx)
@@ -137,10 +140,12 @@ func (s *Server) Stop(ctx context.Context) error {
 	return nil
 }
 
+// handleIndex serves the main HTML page.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "web/templates/index.html")
 }
 
+// handleStatus returns the current operation status and statistics.
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.operationMutex.RLock()
 	running := s.isRunning
@@ -172,6 +177,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleScan starts a scan operation asynchronously.
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	var req ScanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -184,13 +190,12 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if directory exists
 	if _, err := os.Stat(req.Directory); os.IsNotExist(err) {
 		s.writeError(w, "Directory does not exist", http.StatusBadRequest)
 		return
 	}
 
-	go s.runScanAsync(req.Directory)
+	go s.runScanAsyncWithLogs(req.Directory)
 
 	s.writeJSON(w, APIResponse{
 		Success: true,
@@ -198,6 +203,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleOrganize starts an organize operation asynchronously.
 func (s *Server) handleOrganize(w http.ResponseWriter, r *http.Request) {
 	var req OrganizeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -210,7 +216,6 @@ func (s *Server) handleOrganize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if already running
 	s.operationMutex.RLock()
 	if s.isRunning {
 		s.operationMutex.RUnlock()
@@ -219,7 +224,6 @@ func (s *Server) handleOrganize(w http.ResponseWriter, r *http.Request) {
 	}
 	s.operationMutex.RUnlock()
 
-	// Check if directory exists
 	if _, err := os.Stat(req.SourceDirectory); os.IsNotExist(err) {
 		s.writeError(w, "Source directory does not exist", http.StatusBadRequest)
 		return
@@ -233,6 +237,7 @@ func (s *Server) handleOrganize(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleStop stops the current operation.
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.operationMutex.Lock()
 	s.isRunning = false
@@ -248,6 +253,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleGetStatistics returns the current statistics.
 func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	s.operationMutex.RLock()
 	stats := s.currentStats
@@ -275,9 +281,7 @@ func (s *Server) handleGetStatistics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// --- Compression API handlers ---
-
-// handleCompress запускает процесс сжатия изображений (асинхронно)
+// handleCompress starts the image compression process asynchronously.
 func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
 	s.compressionMutex.Lock()
 	if s.compressionRunning {
@@ -301,9 +305,8 @@ func (s *Server) handleCompress(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// runCompressionAsync запускает компрессию в отдельной горутине
+// runCompressionAsync performs image compression in a separate goroutine.
 func (s *Server) runCompressionAsync() {
-	// WebSocket: сообщаем о старте сжатия
 	s.broadcastWSMessage("compression_started", map[string]any{
 		"message":   "Image compression started",
 		"directory": s.cfg.SourceDirectory,
@@ -315,7 +318,6 @@ func (s *Server) runCompressionAsync() {
 		s.compressionMutex.Unlock()
 	}()
 
-	// Получаем параметры из конфига
 	params := s.cfg.Compressor
 	s.log.Infof("runCompressionAsync called: enabled=%v, input=%v", params.Enabled, s.cfg.SourceDirectory)
 
@@ -324,7 +326,6 @@ func (s *Server) runCompressionAsync() {
 		return
 	}
 
-	// Определяем целевую директорию для сжатых файлов (аналогично organizer)
 	targetDir := s.cfg.SourceDirectory
 	if s.cfg.TargetDirectory != nil && *s.cfg.TargetDirectory != "" {
 		targetDir = *s.cfg.TargetDirectory
@@ -337,7 +338,6 @@ func (s *Server) runCompressionAsync() {
 		Formats:    params.Formats,
 	}
 
-	// Проверим, что директория существует и не пуста
 	if len(compParams.InputPaths) == 0 || compParams.InputPaths[0] == "" {
 		s.log.Warn("No input files for compression: input paths empty")
 		return
@@ -358,26 +358,27 @@ func (s *Server) runCompressionAsync() {
 		s.compressionError = err.Error()
 		s.compressionResults = nil
 		s.log.Errorf("Image compression error: %v", err)
-		// WebSocket: сообщаем об ошибке сжатия
 		s.broadcastWSMessage("compression_error", map[string]any{
 			"error": err.Error(),
 		})
 	} else {
 		s.compressionResults = results
-		s.log.Infof("Image compression finished: %d files processed", len(results))
-		// WebSocket: сообщаем об успешном завершении сжатия
-		// Можно добавить краткую статистику
 		var origSize, compSize int64
+		var processedCount int
 		for _, r := range results {
-			origSize += r.OriginalSize
-			compSize += r.CompressedSize
+			if r.Action == "compressed" || r.Action == "original" {
+				origSize += r.OriginalSize
+				compSize += r.CompressedSize
+				processedCount++
+			}
 		}
 		var percent float64
 		if origSize > 0 {
 			percent = float64(origSize-compSize) * 100 / float64(origSize)
 		}
+		s.log.Infof("Image compression finished: %d files processed (only compressed/original), total files: %d", processedCount, len(results))
 		s.broadcastWSMessage("compression_completed", map[string]any{
-			"files_processed": len(results),
+			"files_processed": processedCount,
 			"original_size":   origSize,
 			"compressed_size": compSize,
 			"percent_saved":   percent,
@@ -386,10 +387,7 @@ func (s *Server) runCompressionAsync() {
 	}
 }
 
-// getCompressor возвращает экземпляр компрессора (можно заменить DI)
-// getCompressor больше не нужен, используем s.compressor напрямую
-
-// handleCompressionStatus возвращает статус/результаты компрессии
+// handleCompressionStatus returns the status and results of compression.
 func (s *Server) handleCompressionStatus(w http.ResponseWriter, r *http.Request) {
 	s.compressionMutex.RLock()
 	running := s.compressionRunning
@@ -407,6 +405,7 @@ func (s *Server) handleCompressionStatus(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// handleGetConfig returns the current configuration.
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, APIResponse{
 		Success: true,
@@ -421,6 +420,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleUpdateConfig updates the configuration from the request.
 func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var configUpdate struct {
 		DateFormat        string `json:"date_format,omitempty"`
@@ -436,7 +436,6 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update configuration
 	if configUpdate.DateFormat != "" {
 		s.cfg.DateFormat = configUpdate.DateFormat
 	}
@@ -464,6 +463,7 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleGetDateFormats returns available date formats.
 func (s *Server) handleGetDateFormats(w http.ResponseWriter, r *http.Request) {
 	formats := config.GetAvailableDateFormats()
 	s.writeJSON(w, APIResponse{
@@ -472,29 +472,27 @@ func (s *Server) handleGetDateFormats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleWebSocket upgrades the connection and manages WebSocket clients.
+// handleWebSocket handles WebSocket connections.
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.wsUpgrader.Upgrade(w, r, nil)
+	upgrader := s.wsUpgrader
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.log.Errorf("WebSocket upgrade failed: %v", err)
+		s.log.Warnf("WebSocket upgrade failed: %v", err)
 		return
 	}
-	defer conn.Close()
 
 	s.wsMutex.Lock()
 	s.wsClients[conn] = true
 	s.wsMutex.Unlock()
 
-	s.log.Debug("WebSocket client connected")
-
-	// Remove client on disconnect
 	defer func() {
 		s.wsMutex.Lock()
 		delete(s.wsClients, conn)
 		s.wsMutex.Unlock()
-		s.log.Debug("WebSocket client disconnected")
+		conn.Close()
 	}()
 
-	// Keep connection alive
 	for {
 		_, _, err := conn.ReadMessage()
 		if err != nil {
@@ -503,6 +501,73 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// broadcastWSLog отправляет лог-сообщение всем WS-клиентам
+func (s *Server) broadcastWSLog(level, message string) {
+	s.wsMutex.Lock()
+	defer s.wsMutex.Unlock()
+	for client := range s.wsClients {
+		_ = client.WriteJSON(WSMessage{
+			Type: "log",
+			Data: map[string]any{
+				"level":     level,
+				"message":   message,
+				"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+			},
+		})
+	}
+}
+
+// runScanAsyncWithLogs запускает сканирование с пробросом логов в WebSocket
+func (s *Server) runScanAsyncWithLogs(directory string) {
+	go func() {
+		s.operationMutex.Lock()
+		s.isRunning = true
+		s.operationMutex.Unlock()
+
+		s.broadcastWSMessage("scan_started", map[string]any{
+			"directory": directory,
+		})
+
+		defer func() {
+			s.operationMutex.Lock()
+			s.isRunning = false
+			s.operationMutex.Unlock()
+		}()
+
+		cfg := *s.cfg // Копия!
+		cfg.SourceDirectory = directory
+		cfg.Security.DryRun = true
+
+		log := s.log
+		stats := statistics.NewStatistics()
+		dateExtractor := extractor.NewEXIFExtractor(log)
+		compressor := compressor.NewDefaultCompressor()
+
+		// Создаём organizer с хуком для логов
+		org := organizer.NewFileOrganizerWithLogHook(&cfg, log, stats, dateExtractor, compressor, func(level, message string) {
+			// Только dry-run логи (DRY-RUN: ...) пробрасываем в WebSocket
+			if strings.Contains(message, "DRY-RUN") {
+				s.broadcastWSLog(level, message)
+			}
+		})
+
+		err := org.OrganizeFiles()
+		if err != nil {
+			s.broadcastWSMessage("scan_error", map[string]any{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		s.currentStats = stats
+
+		s.broadcastWSMessage("scan_completed", map[string]any{
+			"statistics": stats.GetSummary(),
+		})
+	}()
+}
+
+// runScanAsync performs a scan operation in a separate goroutine.
 func (s *Server) runScanAsync(directory string) {
 	s.operationMutex.Lock()
 	s.isRunning = true
@@ -513,14 +578,23 @@ func (s *Server) runScanAsync(directory string) {
 		"directory": directory,
 	})
 
-	// Create temporary config for scanning
 	cfg := *s.cfg
 	cfg.SourceDirectory = directory
-	// Always force dry-run for scan
 	cfg.Security.DryRun = true
 
 	dateExtractor := extractor.NewEXIFExtractor(s.log)
-	org := organizer.NewFileOrganizer(&cfg, s.log, s.currentStats, dateExtractor, s.compressor)
+
+	// Прокидываем хук для логов (DRY-RUN и др.) в органайзер
+	org := organizer.NewFileOrganizerWithLogHook(&cfg, s.log, s.currentStats, dateExtractor, s.compressor, func(level, message string) {
+		// Пробрасываем только интересные логи (DRY-RUN, Would move/copy)
+		if strings.Contains(message, "DRY-RUN") || strings.Contains(message, "Would move") || strings.Contains(message, "Would copy") {
+			s.broadcastWSMessage("log", map[string]any{
+				"level":     level,
+				"message":   message,
+				"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+			})
+		}
+	})
 
 	err := org.OrganizeFiles()
 
@@ -539,6 +613,7 @@ func (s *Server) runScanAsync(directory string) {
 	}
 }
 
+// runOrganizeAsync performs an organize operation in a separate goroutine.
 func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 	s.operationMutex.Lock()
 	s.isRunning = true
@@ -551,7 +626,6 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 		"dry_run":          req.DryRun,
 	})
 
-	// Always use the DryRun value from the request, not from config defaults
 	cfg := *s.cfg
 	cfg.SourceDirectory = req.SourceDirectory
 	if req.TargetDirectory != "" {
@@ -559,7 +633,6 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 	}
 	cfg.Security.DryRun = req.DryRun
 
-	// Apply config overrides from request
 	if req.DateFormat != "" {
 		cfg.DateFormat = req.DateFormat
 	}
@@ -567,7 +640,6 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 		cfg.Processing.MoveFiles = *req.MoveFiles
 	}
 
-	// Apply config overrides from request
 	if req.DateFormat != "" {
 		cfg.DateFormat = req.DateFormat
 	}
@@ -595,6 +667,7 @@ func (s *Server) runOrganizeAsync(req OrganizeRequest) {
 	}
 }
 
+// broadcastWSMessage sends a message to all connected WebSocket clients.
 func (s *Server) broadcastWSMessage(messageType string, data any) {
 	message := WSMessage{
 		Type: messageType,
@@ -607,14 +680,13 @@ func (s *Server) broadcastWSMessage(messageType string, data any) {
 		return
 	}
 
-	s.wsMutex.RLock()
-	defer s.wsMutex.RUnlock()
+	s.wsMutex.Lock()
+	defer s.wsMutex.Unlock()
 
 	for conn := range s.wsClients {
 		err := conn.WriteMessage(websocket.TextMessage, msgBytes)
 		if err != nil {
 			s.log.Errorf("Failed to write WebSocket message: %v", err)
-			// Remove failed connection
 			go func(c *websocket.Conn) {
 				s.wsMutex.Lock()
 				delete(s.wsClients, c)
@@ -625,11 +697,13 @@ func (s *Server) broadcastWSMessage(messageType string, data any) {
 	}
 }
 
+// writeJSON writes a JSON response to the client.
 func (s *Server) writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
 }
 
+// writeError writes an error response in JSON format.
 func (s *Server) writeError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)

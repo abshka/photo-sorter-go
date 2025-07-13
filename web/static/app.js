@@ -35,7 +35,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Setup WebSocket event handlers
+   * Set up WebSocket event handlers
    */
   setupWebSocketHandlers() {
     this.ws.onopen = () => {
@@ -74,7 +74,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Schedule reconnection attempt
+   * Schedule a reconnection attempt
    */
   scheduleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -97,10 +97,9 @@ class PhotoSorterApp {
   }
 
   /**
-   * Update connection status indicator
+   * Update connection status indicator in the UI
    */
   updateConnectionStatus(connected) {
-    // Add visual indicator for connection status
     const statusIndicator = document.getElementById("connectionStatus");
     if (statusIndicator) {
       statusIndicator.className = connected ? "connected" : "disconnected";
@@ -109,10 +108,9 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind events for UI interactions
+   * Bind UI events
    */
   bindEvents() {
-    // Main action buttons
     this.bindButton("scanBtn", () => {
       this.clearCompressionSummary();
       this.stopCompressionPollingAndStatus();
@@ -126,36 +124,29 @@ class PhotoSorterApp {
     this.bindButton("stopBtn", () => this.stopOperation());
     this.bindButton("saveConfigBtn", () => this.saveConfig());
 
-    // Compression
     this.bindButton("startCompressionBtn", () => {
       this.clearCompressionSummary();
       this.stopCompressionPollingAndStatus();
       this.startCompression();
     });
 
-    // Form inputs
     this.bindInput("sourceDir", (value) => this.validateSourceDirectory(value));
     this.bindInput("targetDir", (value) => this.validateTargetDirectory(value));
 
-    // Configuration changes
     this.bindSelect("dateFormat", () => this.updateConfigDisplay());
     this.bindSelect("duplicateHandling", () => this.updateConfigDisplay());
     this.bindCheckbox("moveFilesCheck", () => this.updateConfigDisplay());
-    this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
+    // this.bindCheckbox("dryRunCheck", () => this.updateConfigDisplay());
 
-    // Keyboard shortcuts
-
-    // Compression config change
     this.bindCheckbox("compressionEnabled", () => this.updateConfigDisplay());
     this.bindKeyboardShortcuts();
 
-    // Window events
     window.addEventListener("beforeunload", () => this.cleanup());
     window.addEventListener("focus", () => this.updateStatus());
   }
 
   /**
-   * Bind button with error handling
+   * Bind a button with error handling
    */
   bindButton(id, handler) {
     const element = document.getElementById(id);
@@ -175,7 +166,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind input field with validation
+   * Bind an input field with validation
    */
   bindInput(id, validator) {
     const element = document.getElementById(id);
@@ -183,7 +174,6 @@ class PhotoSorterApp {
       element.addEventListener("input", (event) => {
         try {
           validator(event.target.value);
-          // Clear drop zone state when user types manually
           if (typeof this.clearDropZoneState === "function") {
             this.clearDropZoneState(id);
           }
@@ -195,7 +185,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind select field with handler
+   * Bind a select field with handler
    */
   bindSelect(id, handler) {
     const element = document.getElementById(id);
@@ -211,7 +201,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind checkbox field with handler
+   * Bind a checkbox field with handler
    */
   bindCheckbox(id, handler) {
     const element = document.getElementById(id);
@@ -227,7 +217,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Bind keyboard shortcuts
+   * Bind keyboard shortcuts for actions
    */
   bindKeyboardShortcuts() {
     document.addEventListener("keydown", (event) => {
@@ -288,13 +278,11 @@ class PhotoSorterApp {
   updateUI(data) {
     const { running, statistics } = data;
 
-    // Update operation status
     this.updateElement("operationStatus", running ? "Running..." : "Ready");
     this.updateElement("scanBtn", null, { disabled: running });
     this.updateElement("organizeBtn", null, { disabled: running });
     this.toggleElement("stopBtn", running);
 
-    // Update statistics
     if (statistics && statistics.files) {
       const { files } = statistics;
       this.updateElement("filesFound", files.total_found || 0);
@@ -305,7 +293,6 @@ class PhotoSorterApp {
       this.updateElement("errorsCount", files.errors || 0);
       this.updateElement("filesCopied", files.copied || 0);
 
-      // Update progress bar
       const progress =
         files.total_found > 0 ? (files.total_processed / files.total_found) * 100 : 0;
       this.updateProgressBar(progress);
@@ -313,7 +300,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Scan directory operation
+   * Start scan directory operation
    */
   async scanDirectory() {
     const sourceDir = this.getInputValue("sourceDir");
@@ -327,7 +314,6 @@ class PhotoSorterApp {
       return;
     }
 
-    // Check if this looks like a relative path and warn user
     if (!sourceDir.startsWith("/") && !sourceDir.match(/^[A-Za-z]:/)) {
       this.showAlert(
         `Warning: "${sourceDir}" appears to be a relative path. Please enter the full absolute path to your folder (e.g., /home/user/Photos or C:\\Users\\User\\Photos)`,
@@ -343,14 +329,13 @@ class PhotoSorterApp {
       });
       const data = await response.json();
       if (data.success) {
-        // this.showAlert("Scan started successfully", "success");
+        // Scan started successfully
       } else {
         throw new Error(data.error || "Scan failed");
       }
     } catch (error) {
       let errorMessage = error.message;
 
-      // Provide more helpful error messages
       if (error.message.includes("400") || error.message.includes("Bad Request")) {
         errorMessage = `Directory not found: "${sourceDir}". Please check the path and ensure you're using the full absolute path to your folder.`;
       }
@@ -361,12 +346,11 @@ class PhotoSorterApp {
   }
 
   /**
-   * Organize photos operation
+   * Start organize photos operation
    */
   async organizePhotos() {
     const sourceDir = this.getInputValue("sourceDir");
     const targetDir = this.getInputValue("targetDir");
-    const dryRun = this.getCheckboxValue("dryRunCheck");
 
     if (!sourceDir) {
       this.showAlert("Please enter a source directory", "error");
@@ -374,23 +358,16 @@ class PhotoSorterApp {
     }
 
     if (!this.validatePath(sourceDir)) {
-      this.showAlert("Please enter a valid source directory path", "error");
+      this.showAlert("Please enter a valid directory path", "error");
       return;
     }
 
-    if (targetDir && !this.validatePath(targetDir)) {
-      this.showAlert("Please enter a valid target directory path", "error");
+    // Always ask for confirmation before organizing (since dry-run checkbox is removed)
+    const confirmed = confirm(
+      `Are you sure you want to organize photos?\nSource: ${sourceDir}\nTarget: ${targetDir || "In place"}\n\nThis will move/modify your files!`,
+    );
+    if (!confirmed) {
       return;
-    }
-
-    // Confirm operation if not dry run
-    if (!dryRun) {
-      const confirmed = confirm(
-        `Are you sure you want to organize photos?\nSource: ${sourceDir}\nTarget: ${targetDir || "In place"}\n\nThis will move/modify your files!`,
-      );
-      if (!confirmed) {
-        return;
-      }
     }
 
     try {
@@ -403,7 +380,7 @@ class PhotoSorterApp {
         body: JSON.stringify({
           source_directory: sourceDir,
           target_directory: targetDir || null,
-          dry_run: dryRun,
+          dry_run: false,
           date_format: dateFormat,
           move_files: moveFiles,
         }),
@@ -411,13 +388,14 @@ class PhotoSorterApp {
 
       const data = await response.json();
       if (data.success) {
-        // this.showAlert("Organization started successfully", "success");
+        // Organization started successfully
       } else {
         throw new Error(data.error || "Organization failed");
       }
     } catch (error) {
-      this.showAlert(`Failed to start organization: ${error.message}`, "error");
-      this.log(`Organization error: ${error.message}`, "error");
+      let errorMessage = error.message;
+      this.showAlert(`Failed to start organization: ${errorMessage}`, "error");
+      this.log(`Organization error: ${errorMessage}`, "error");
     }
   }
 
@@ -444,11 +422,9 @@ class PhotoSorterApp {
    * Start image compression operation
    */
   async startCompression() {
-    // Собираем параметры из формы
     const enabled = document.getElementById("compressionEnabled").checked;
     if (!enabled) {
       this.showAlert("Enable the compression checkbox to start.", "warning");
-      // Очищаем статус и статистику, если вдруг что-то осталось
       this.updateElement("compressionStatus", "");
       this.updateElement("compressionSummary", "");
       return;
@@ -461,12 +437,10 @@ class PhotoSorterApp {
       .map((f) => f.trim())
       .filter(Boolean);
 
-    // Очищаем статус и результаты
     this.updateElement("compressionStatus", "Starting compression...");
     this.updateElement("compressionResults", "");
 
     try {
-      // Use all parameters in the request body
       const response = await fetch("/api/compress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -497,7 +471,7 @@ class PhotoSorterApp {
   pollCompressionStatus() {
     if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
     this._compressionPollInterval = setInterval(() => this.updateCompressionStatus(), 2000);
-    this.updateCompressionStatus(); // сразу
+    this.updateCompressionStatus();
   }
 
   /**
@@ -522,8 +496,6 @@ class PhotoSorterApp {
         if (this._compressionPollInterval) clearInterval(this._compressionPollInterval);
       } else if (results && results.length > 0) {
         this.updateElement("compressionStatus", "Compression finished.");
-        // Статистика теперь выводится только через compressionSummary, таблица не используется
-        // Считаем только реально сжатые файлы (compressed/original)
         let compressed = results.filter(
           (r) =>
             r.action === "compressed" ||
@@ -562,10 +534,9 @@ class PhotoSorterApp {
   }
 
   /**
-   * Render compression results (теперь не используется, оставлено для совместимости)
+   * Render compression results (legacy, not used)
    */
   renderCompressionResults(results) {
-    // Очищаем таблицу, выводим только текстовую статистику через compressionSummary
     this.updateElement("compressionResults", "");
     if (!Array.isArray(results) || results.length === 0) {
       this.updateElement("compressionSummary", "");
@@ -597,7 +568,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Escape HTML
+   * Escape HTML special characters
    */
   escapeHtml(str) {
     return String(str)
@@ -614,19 +585,25 @@ class PhotoSorterApp {
   handleWebSocketMessage(message) {
     const { type, data } = message;
 
-    // Debug: log all incoming WebSocket messages
     console.log("WebSocket message received:", { type, data, timestamp: new Date().toISOString() });
 
     switch (type) {
+      case "log":
+        // Логи DRY-RUN/Would move/copy и др. из backend
+        this.log(
+          data && data.message
+            ? `[${data.timestamp || new Date().toLocaleTimeString()}] ${data.message}`
+            : "Log message",
+          data && data.level ? data.level : "info",
+        );
+        break;
       case "scan_started":
         console.log("Processing scan_started message:", data);
         this.log(`Scan started for: ${data.directory}`, "info");
         break;
       case "scan_completed":
-        // Попробуем извлечь количество найденных файлов из statistics, если оно есть
         let filesFound = null;
         if (data && data.statistics) {
-          // Ищем строку "Total Found: N" в summary
           const match =
             typeof data.statistics === "string"
               ? data.statistics.match(/Total Found:\s*(\d+)/)
@@ -669,12 +646,10 @@ class PhotoSorterApp {
         break;
       case "compression_completed":
         {
-          // Для лога используем те же значения, что и в compressionSummary
           let origSize = 0,
             compSize = 0,
             percent = 0;
           if (Array.isArray(data.results) && data.results.length > 0) {
-            // Считаем только реально сжатые файлы (compressed/original)
             let compressed = data.results.filter(
               (r) =>
                 r.action === "compressed" ||
@@ -701,7 +676,6 @@ class PhotoSorterApp {
           }
           msg += ` | Original Size: ${this.formatSize(origSize)}, Compressed Size: ${this.formatSize(compSize)}, Saved: ${percent.toFixed(1)}%`;
           this.log(msg, "success");
-          // Если все файлы были skipped, выводим отдельное сообщение
           if (
             typeof data.files_processed === "number" &&
             data.files_processed > 0 &&
@@ -712,7 +686,6 @@ class PhotoSorterApp {
               "All files were skipped (already compressed).",
             );
           } else {
-            // Также выводим краткую статистику в compressionSummary
             const summary = [
               `Original Size: ${this.formatSize(origSize)}`,
               `Compressed Size: ${this.formatSize(compSize)}`,
@@ -743,7 +716,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Log message to console
+   * Log message to console and UI
    */
   log(message, type = "info") {
     const container = document.getElementById("logContainer");
@@ -752,22 +725,26 @@ class PhotoSorterApp {
     const entry = document.createElement("div");
     entry.className = `log-entry log-${type}`;
 
-    const timestamp = new Date().toLocaleTimeString();
+    // Форматировать время в 24-часовом формате HH:mm:ss
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString("ru-RU", { hour12: false }).padStart(8, "0");
+
+    // Убрать дублирующийся timestamp из сообщения (например, [2025-07-13 17:21:31])
+    let cleanMessage = message.replace(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s*/, "");
+
     entry.innerHTML = `
       <span class="log-timestamp">[${timestamp}]</span>
       <span class="log-type">[${type.toUpperCase()}]</span>
-      <span class="log-message">${this.escapeHtml(message)}</span>
+      <span class="log-message">${this.escapeHtml(cleanMessage)}</span>
     `;
 
     container.appendChild(entry);
     container.scrollTop = container.scrollHeight;
 
-    // Keep only last 100 entries
     while (container.children.length > 100) {
       container.removeChild(container.firstChild);
     }
 
-    // Console logging for debugging
     if (type === "error") {
       console.error(`[PhotoSorter] ${message}`);
     } else {
@@ -776,11 +753,9 @@ class PhotoSorterApp {
   }
 
   /**
-   * Show alert message
+   * Show alert message for errors and warnings
    */
-  // showAlert отключён для пользовательских действий
   showAlert(message, type) {
-    // Оставляем только для ошибок валидации и критических ошибок
     if (type === "error" || type === "warning") {
       const alertsContainer = document.getElementById("alerts");
       if (!alertsContainer) return;
@@ -794,14 +769,11 @@ class PhotoSorterApp {
 
       alertsContainer.appendChild(alert);
 
-      // Auto-remove after 5 seconds
       setTimeout(() => {
         alert.remove();
       }, 5000);
     }
   }
-
-  // Utility methods
 
   /**
    * Fetch with timeout
@@ -831,12 +803,9 @@ class PhotoSorterApp {
    */
   validatePath(path) {
     if (!path || typeof path !== "string") return false;
-    if (path.includes("..")) return false; // Security: prevent directory traversal
+    if (path.includes("..")) return false;
     const trimmed = path.trim();
     if (trimmed.length === 0) return false;
-
-    // Basic path format validation
-    // Allow both Unix-style (/path/to/dir) and Windows-style (C:\path\to\dir) paths
     const isValidFormat = /^([a-zA-Z]:[\\\/]|[\\\/]|[a-zA-Z0-9])[^<>:"|?*]*$/.test(trimmed);
     return isValidFormat;
   }
@@ -875,7 +844,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Update element content
+   * Update element content and attributes
    */
   updateElement(id, content, attributes = {}) {
     const element = document.getElementById(id);
@@ -933,14 +902,14 @@ class PhotoSorterApp {
   }
 
   /**
-   * Очищает compressionSummary
+   * Clear compression summary
    */
   clearCompressionSummary() {
     this.updateElement("compressionSummary", "");
   }
 
   /**
-   * Останавливает опрос compressionStatus и сбрасывает compressionStatus
+   * Stop polling compression status and reset status
    */
   stopCompressionPollingAndStatus() {
     if (this._compressionPollInterval) {
@@ -951,7 +920,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Очищает compressionSummary через 10 секунд
+   * Automatically clear compression summary after 10 seconds
    */
   autoClearCompressionSummary() {
     clearTimeout(this._compressionSummaryTimeout);
@@ -961,7 +930,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Load configuration from server
+   * Get checkbox value
    */
   getCheckboxValue(id) {
     const element = document.getElementById(id);
@@ -1007,7 +976,6 @@ class PhotoSorterApp {
       if (data.success) {
         const config = data.data;
 
-        // Update form fields
         this.setSelectValue("dateFormat", config.date_format || "2006/01/02");
         this.setCheckboxValue("moveFilesCheck", config.move_files !== false);
         this.setSelectValue("duplicateHandling", config.duplicate_handling || "rename");
@@ -1052,7 +1020,6 @@ class PhotoSorterApp {
 
       const data = await response.json();
       if (data.success) {
-        // this.showAlert("Configuration saved successfully", "success");
         this.log("Configuration saved", "info");
         this.updateConfigDisplay();
       } else {
@@ -1065,7 +1032,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Update configuration display
+   * Update configuration display in the UI
    */
   updateConfigDisplay() {
     const dateFormat = this.getSelectValue("dateFormat");
@@ -1097,7 +1064,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Update progress bar
+   * Update progress bar in the UI
    */
   updateProgressBar(percentage) {
     const progressFill = document.getElementById("progressFill");
@@ -1116,7 +1083,7 @@ class PhotoSorterApp {
   }
 
   /**
-   * Cleanup on page unload
+   * Cleanup resources on page unload
    */
   cleanup() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -1129,12 +1096,10 @@ class PhotoSorterApp {
   }
 }
 
-// Initialize the application when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
   window.photoSorterApp = new PhotoSorterApp();
 });
 
-// Export for testing or external access
 if (typeof module !== "undefined" && module.exports) {
   module.exports = PhotoSorterApp;
 }

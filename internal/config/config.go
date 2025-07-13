@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// DateFormatOption represents a predefined date format option
+// DateFormatOption defines a predefined date format option.
 type DateFormatOption struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -20,8 +20,7 @@ type DateFormatOption struct {
 	Description string `json:"description"`
 }
 
-// CompressorConfig contains image compression settings
-// OutputDir is deprecated; compressed images are now saved to TargetDirectory.
+// CompressorConfig holds image compression settings.
 type CompressorConfig struct {
 	Enabled   bool     `mapstructure:"enabled"`
 	Quality   int      `mapstructure:"quality"`
@@ -30,7 +29,7 @@ type CompressorConfig struct {
 	// OutputDir string   `mapstructure:"output_dir"` // Deprecated
 }
 
-// Config represents the main configuration structure
+// Config is the main configuration structure.
 type Config struct {
 	SourceDirectory     string            `mapstructure:"source_directory" validate:"required"`
 	TargetDirectory     *string           `mapstructure:"target_directory"`
@@ -44,7 +43,7 @@ type Config struct {
 	Compressor          CompressorConfig  `mapstructure:"compressor"`
 }
 
-// ProcessingConfig contains file processing settings
+// ProcessingConfig holds file processing settings.
 type ProcessingConfig struct {
 	MoveFiles         bool   `mapstructure:"move_files"`
 	DuplicateHandling string `mapstructure:"duplicate_handling"`
@@ -52,21 +51,21 @@ type ProcessingConfig struct {
 	CreateBackups     bool   `mapstructure:"create_backups"`
 }
 
-// VideoConfig contains video processing settings
+// VideoConfig holds video processing settings.
 type VideoConfig struct {
 	MPGProcessing        MPGProcessingConfig `mapstructure:"mpg_processing"`
 	ExtractVideoMetadata bool                `mapstructure:"extract_video_metadata"`
 	SupportedExtensions  []string            `mapstructure:"supported_extensions"`
 }
 
-// MPGProcessingConfig contains MPG/THM merging settings
+// MPGProcessingConfig holds MPG/THM merging settings.
 type MPGProcessingConfig struct {
 	EnableMerging       bool `mapstructure:"enable_merging"`
 	DeleteTHMAfterMerge bool `mapstructure:"delete_thm_after_merge"`
 	CreateBackup        bool `mapstructure:"create_backup"`
 }
 
-// PerformanceConfig contains performance tuning settings
+// PerformanceConfig holds performance tuning settings.
 type PerformanceConfig struct {
 	BatchSize     int  `mapstructure:"batch_size"`
 	WorkerThreads int  `mapstructure:"worker_threads"`
@@ -74,24 +73,24 @@ type PerformanceConfig struct {
 	CacheSize     int  `mapstructure:"cache_size"`
 }
 
-// SecurityConfig contains security and safety settings
+// SecurityConfig holds security and safety settings.
 type SecurityConfig struct {
 	DryRun             bool `mapstructure:"dry_run"`
 	ConfirmBeforeStart bool `mapstructure:"confirm_before_start"`
 	MaxFilesPerRun     int  `mapstructure:"max_files_per_run"`
 }
 
-// LoggingConfig contains logging settings
+// LoggingConfig holds logging settings.
 type LoggingConfig struct {
 	Level      string `mapstructure:"level"`
 	FilePath   string `mapstructure:"file_path"`
-	MaxSize    int    `mapstructure:"max_size"` // MB
+	MaxSize    int    `mapstructure:"max_size"`
 	MaxBackups int    `mapstructure:"max_backups"`
-	MaxAge     int    `mapstructure:"max_age"` // days
+	MaxAge     int    `mapstructure:"max_age"`
 	Compress   bool   `mapstructure:"compress"`
 }
 
-// GetAvailableDateFormats returns all available date format options
+// GetAvailableDateFormats returns all available date format options.
 func GetAvailableDateFormats() []DateFormatOption {
 	return []DateFormatOption{
 		{
@@ -132,17 +131,17 @@ func GetAvailableDateFormats() []DateFormatOption {
 	}
 }
 
-// DefaultConfig returns a configuration with default values
+// DefaultConfig returns a configuration with default values.
 func DefaultConfig() *Config {
 	return &Config{
-		DateFormat: "2006/01/02", // Go time format for YYYY/MM/DD
+		DateFormat: "2006/01/02",
 		SupportedExtensions: []string{
 			".jpg", ".jpeg", ".png", ".tiff", ".tif",
 			".cr2", ".nef", ".arw", ".dng", ".raw",
 		},
 		Processing: ProcessingConfig{
 			MoveFiles:         true,
-			DuplicateHandling: "rename", // rename, skip, overwrite
+			DuplicateHandling: "rename",
 			SkipOrganized:     true,
 			CreateBackups:     false,
 		},
@@ -166,7 +165,7 @@ func DefaultConfig() *Config {
 		Security: SecurityConfig{
 			DryRun:             false,
 			ConfirmBeforeStart: true,
-			MaxFilesPerRun:     0, // 0 means no limit
+			MaxFilesPerRun:     0,
 		},
 		Logging: LoggingConfig{
 			Level:      "info",
@@ -181,12 +180,11 @@ func DefaultConfig() *Config {
 			Quality:   85,
 			Threshold: 1.01,
 			Formats:   []string{".jpg", ".jpeg", ".png", ".webp"},
-			// OutputDir:         "./compressed", // Deprecated
 		},
 	}
 }
 
-// LoadConfig loads configuration from file and environment variables
+// LoadConfig loads configuration from file and environment variables.
 func LoadConfig(configPath string) (*Config, error) {
 	config := DefaultConfig()
 
@@ -195,32 +193,26 @@ func LoadConfig(configPath string) (*Config, error) {
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
 	} else {
-		// Look for config file in current directory and home directory
 		viper.SetConfigName("config")
 		viper.AddConfigPath(".")
 		viper.AddConfigPath("$HOME/.photo-sorter")
 		viper.AddConfigPath("/etc/photo-sorter")
 	}
 
-	// Enable environment variable support
 	viper.SetEnvPrefix("PHOTO_SORTER")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
-	// Try to read config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
-		// Config file not found is OK, we'll use defaults
 	}
 
-	// Unmarshal config
 	if err := viper.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
 
-	// Validate and normalize config
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
@@ -228,9 +220,8 @@ func LoadConfig(configPath string) (*Config, error) {
 	return config, nil
 }
 
-// Validate validates the configuration
+// Validate checks the configuration for correctness.
 func (c *Config) Validate() error {
-	// Validate source directory
 	if c.SourceDirectory == "" {
 		return fmt.Errorf("source_directory is required")
 	}
@@ -239,26 +230,22 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("source_directory does not exist or is not accessible: %s", c.SourceDirectory)
 	}
 
-	// Validate target directory if provided
 	if c.TargetDirectory != nil && *c.TargetDirectory != "" {
 		if !isValidPath(*c.TargetDirectory) {
 			return fmt.Errorf("target_directory does not exist or is not accessible: %s", *c.TargetDirectory)
 		}
 	}
 
-	// Validate date format
 	if c.DateFormat == "" {
 		c.DateFormat = "2006/01/02"
 	}
 
-	// Test date format
 	testTime := time.Date(2023, 12, 25, 15, 30, 45, 0, time.UTC)
 	testFormatted := testTime.Format(c.DateFormat)
 	if testFormatted == c.DateFormat {
 		return fmt.Errorf("invalid date format: %s", c.DateFormat)
 	}
 
-	// Validate duplicate handling strategy
 	validStrategies := map[string]bool{
 		"rename":    true,
 		"skip":      true,
@@ -269,11 +256,9 @@ func (c *Config) Validate() error {
 			c.Processing.DuplicateHandling)
 	}
 
-	// Validate extensions format
 	c.SupportedExtensions = normalizeExtensions(c.SupportedExtensions)
 	c.Video.SupportedExtensions = normalizeExtensions(c.Video.SupportedExtensions)
 
-	// Validate performance settings
 	if c.Performance.BatchSize <= 0 {
 		c.Performance.BatchSize = 100
 	}
@@ -284,7 +269,6 @@ func (c *Config) Validate() error {
 		c.Performance.CacheSize = 1000
 	}
 
-	// Validate logging settings
 	validLogLevels := map[string]bool{
 		"debug": true,
 		"info":  true,
@@ -298,7 +282,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// GetTargetDirectory returns the target directory or source directory if target is not set
+// GetTargetDirectory returns the target directory or the source directory if target is not set.
 func (c *Config) GetTargetDirectory() string {
 	if c.TargetDirectory != nil && *c.TargetDirectory != "" {
 		return *c.TargetDirectory
@@ -306,13 +290,13 @@ func (c *Config) GetTargetDirectory() string {
 	return c.SourceDirectory
 }
 
-// IsInPlaceOrganization returns true if organizing files in place
+// IsInPlaceOrganization returns true if files are organized in place.
 func (c *Config) IsInPlaceOrganization() bool {
 	return c.TargetDirectory == nil || *c.TargetDirectory == "" ||
 		*c.TargetDirectory == c.SourceDirectory
 }
 
-// GetAllSupportedExtensions returns all supported extensions (images + video)
+// GetAllSupportedExtensions returns all supported extensions for images and videos.
 func (c *Config) GetAllSupportedExtensions() []string {
 	all := make([]string, 0, len(c.SupportedExtensions)+len(c.Video.SupportedExtensions))
 	all = append(all, c.SupportedExtensions...)
@@ -320,20 +304,19 @@ func (c *Config) GetAllSupportedExtensions() []string {
 	return all
 }
 
-// IsImageExtension checks if the extension is for an image file
+// IsImageExtension returns true if the extension is for an image file.
 func (c *Config) IsImageExtension(ext string) bool {
 	ext = strings.ToLower(ext)
 	return slices.Contains(c.SupportedExtensions, ext)
 }
 
-// IsVideoExtension checks if the extension is for a video file
+// IsVideoExtension returns true if the extension is for a video file.
 func (c *Config) IsVideoExtension(ext string) bool {
 	ext = strings.ToLower(ext)
 	return slices.Contains(c.Video.SupportedExtensions, ext)
 }
 
-// Helper functions
-
+// isValidPath checks if the given path exists and is a directory.
 func isValidPath(path string) bool {
 	if path == "" {
 		return false
@@ -352,6 +335,7 @@ func isValidPath(path string) bool {
 	return err == nil && stat.IsDir()
 }
 
+// normalizeExtensions returns a normalized slice of file extensions.
 func normalizeExtensions(extensions []string) []string {
 	normalized := make([]string, len(extensions))
 	for i, ext := range extensions {
