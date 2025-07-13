@@ -139,8 +139,8 @@ Starts the web interface server.
 
 PhotoSorter can be configured in two ways:
 
-1. **Web Interface** (Recommended): Use the built-in configuration editor in the web interface
-2. **YAML File**: Copy `config.example.yaml` to `config.yaml` and modify as needed
+1. **Web Interface** (Recommended): Use the built-in configuration editor in the web interface.
+2. **YAML File**: Copy `config.example.yaml` to `config.yaml` and modify as needed.
 
 ### Configuration Locations
 
