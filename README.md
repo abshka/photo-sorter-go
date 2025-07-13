@@ -1,6 +1,6 @@
 # PhotoSorter Go
 
-A powerful command-line tool for automatically organizing photos and videos by date using EXIF metadata. This is a Go port of the original Python PhotoSorter with enhanced performance and cross-platform compatibility.
+A powerful command-line tool for automatically organizing photos and videos by date using EXIF metadata.
 
 ## Features
 
